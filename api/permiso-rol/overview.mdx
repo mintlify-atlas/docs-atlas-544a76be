@@ -1,0 +1,426 @@
+---
+title: "PermisoRol API"
+description: "API reference for permission-role junction table endpoints"
+---
+
+# PermisoRol API
+
+The **PermisoRol** entity is a **junction table** that creates many-to-many relationships between permissions (Permiso) and roles (Rol). This enables fine-grained access control by assigning multiple permissions to each role.
+
+## Entity Overview
+
+The permission-role junction enables:
+- Many-to-many relationship between Permiso and Rol
+- Role-based permission assignment
+- Composite primary key (id_permiso + id_rol)
+- Flexible access control configuration
+
+<Note>
+PermisoRol is a junction table without a single primary key. It uses a composite key composed of id_permiso and id_rol.
+</Note>
+
+## Entity Schema
+
+```typescript title="src/models/PermisoRol.ts" lines
+@Entity("permiso_rol")
+export class PermisoRol {
+  @PrimaryColumn()
+  id_permiso!: number;
+
+  @PrimaryColumn()
+  id_rol!: number;
+
+  @ManyToOne(() => Permiso, (p) => p.permisoRoles)
+  @JoinColumn({ name: "id_permiso" })
+  permiso!: Permiso;
+
+  @ManyToOne(() => Rol, (r) => r.permisoRoles)
+  @JoinColumn({ name: "id_rol" })
+  rol!: Rol;
+}
+```
+
+### Schema Fields
+
+<ResponseField name="id_permiso" type="number">
+  Primary key component - Permission ID
+</ResponseField>
+
+<ResponseField name="id_rol" type="number">
+  Primary key component - Role ID
+</ResponseField>
+
+<ResponseField name="permiso" type="Permiso">
+  Many-to-one relationship with Permission
+</ResponseField>
+
+<ResponseField name="rol" type="Rol">
+  Many-to-one relationship with Role
+</ResponseField>
+
+## API Endpoints
+
+### GET /api/permiso-rol
+
+List all permission-role assignments.
+
+**Authentication**: Required (Admin role)
+
+**Request**:
+```bash
+curl -X GET https://api.example.com/api/permiso-rol \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+**Response** (200):
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id_permiso": 1,
+      "id_rol": 1
+    },
+    {
+      "id_permiso": 2,
+      "id_rol": 1
+    },
+    {
+      "id_permiso": 3,
+      "id_rol": 2
+    }
+  ]
+}
+```
+
+<Note>
+The GET endpoint returns only the IDs. To get full permission and role details, query the Permiso and Rol endpoints separately or load relations in your custom queries.
+</Note>
+
+### POST /api/permiso-rol
+
+Assign a permission to a role.
+
+**Authentication**: Required (Admin role)
+
+**Request**:
+```bash
+curl -X POST https://api.example.com/api/permiso-rol \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -d '{
+    "id_permiso": 5,
+    "id_rol": 2
+  }'
+```
+
+**Request Body**:
+
+<ParamField path="id_permiso" type="number" required>
+  ID of the permission to assign
+</ParamField>
+
+<ParamField path="id_rol" type="number" required>
+  ID of the role to receive the permission
+</ParamField>
+
+**Response** (201):
+```json
+{
+  "success": true,
+  "message": "PermisoRol creado",
+  "data": {
+    "id_permiso": 5,
+    "id_rol": 2
+  }
+}
+```
+
+**Error Responses**:
+
+- **400 Bad Request** - Missing required fields
+  ```json
+  {
+    "success": false,
+    "message": "id_permiso e id_rol son requeridos"
+  }
+  ```
+
+- **404 Not Found** - Invalid permission or role ID
+  ```json
+  {
+    "success": false,
+    "message": "Permiso no encontrado"
+  }
+  ```
+
+- **409 Conflict** - Permission already assigned to role
+  ```json
+  {
+    "success": false,
+    "message": "La relación ya existe"
+  }
+  ```
+
+### DELETE /api/permiso-rol
+
+Remove a permission from a role.
+
+**Authentication**: Required (Admin role)
+
+<Warning>
+This endpoint uses the request body (not URL params) to identify the record to delete, since there's no single primary key.
+</Warning>
+
+**Request**:
+```bash
+curl -X DELETE https://api.example.com/api/permiso-rol \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -d '{
+    "id_permiso": 5,
+    "id_rol": 2
+  }'
+```
+
+**Request Body**:
+
+<ParamField path="id_permiso" type="number" required>
+  ID of the permission to remove
+</ParamField>
+
+<ParamField path="id_rol" type="number" required>
+  ID of the role to remove permission from
+</ParamField>
+
+**Response** (200):
+```json
+{
+  "success": true,
+  "message": "PermisoRol eliminado"
+}
+```
+
+**Error Response** (404):
+```json
+{
+  "success": false,
+  "message": "PermisoRol no encontrado"
+}
+```
+
+## Common Use Cases
+
+### Assign Multiple Permissions to a Role
+
+```typescript
+const permisoRolRepo = AppDataSource.getRepository(PermisoRol);
+const permisoIds = [1, 2, 3, 4, 5]; // Permission IDs to assign
+const rolId = 2; // Empleado role
+
+for (const permisoId of permisoIds) {
+  const existing = await permisoRolRepo.findOne({
+    where: { 
+      permiso: { id_permiso: permisoId },
+      rol: { id_rol: rolId }
+    },
+  });
+
+  if (!existing) {
+    const assignment = permisoRolRepo.create({
+      permiso: { id_permiso: permisoId },
+      rol: { id_rol: rolId },
+    });
+    await permisoRolRepo.save(assignment);
+  }
+}
+```
+
+### Get All Permissions for a Role
+
+```typescript
+const permisoRolRepo = AppDataSource.getRepository(PermisoRol);
+
+const assignments = await permisoRolRepo.find({
+  where: { rol: { id_rol: 1 } }, // Admin role
+  relations: ["permiso"],
+});
+
+const permissions = assignments.map(a => a.permiso);
+console.log(`Admin has ${permissions.length} permissions`);
+```
+
+### Check if Role Has Permission
+
+```typescript
+const permisoRolRepo = AppDataSource.getRepository(PermisoRol);
+
+const hasPermission = await permisoRolRepo.findOne({
+  where: {
+    permiso: { id_permiso: 5 },
+    rol: { id_rol: 2 },
+  },
+});
+
+if (hasPermission) {
+  console.log("Role has this permission");
+} else {
+  console.log("Permission not granted");
+}
+```
+
+### Get All Roles with a Specific Permission
+
+```typescript
+const permisoRolRepo = AppDataSource.getRepository(PermisoRol);
+
+const assignments = await permisoRolRepo.find({
+  where: { permiso: { id_permiso: 1 } }, // "crear_usuario" permission
+  relations: ["rol"],
+});
+
+const roles = assignments.map(a => a.rol);
+console.log(`Roles with permission:`, roles.map(r => r.nombre));
+```
+
+### Remove All Permissions from a Role
+
+```typescript
+const permisoRolRepo = AppDataSource.getRepository(PermisoRol);
+
+const assignments = await permisoRolRepo.find({
+  where: { rol: { id_rol: 3 } },
+});
+
+await permisoRolRepo.remove(assignments);
+console.log(`Removed ${assignments.length} permissions from role`);
+```
+
+## Permission Assignment Patterns
+
+### Admin Role Setup
+
+Assign all permissions to the Admin role:
+
+```typescript
+const permisoRepo = AppDataSource.getRepository(Permiso);
+const permisoRolRepo = AppDataSource.getRepository(PermisoRol);
+const adminRolId = 1;
+
+const allPermisos = await permisoRepo.find({ where: { estado: true } });
+
+for (const permiso of allPermisos) {
+  const assignment = permisoRolRepo.create({
+    permiso: { id_permiso: permiso.id_permiso },
+    rol: { id_rol: adminRolId },
+  });
+  await permisoRolRepo.save(assignment);
+}
+```
+
+### Limited Role Setup
+
+Assign specific permissions to an Empleado role:
+
+```typescript
+const empleadoPermissions = [
+  "ver_clientes",
+  "crear_citas",
+  "ver_ventas",
+  "crear_pagos",
+];
+
+const permisoRepo = AppDataSource.getRepository(Permiso);
+const permisoRolRepo = AppDataSource.getRepository(PermisoRol);
+const empleadoRolId = 2;
+
+for (const permisoName of empleadoPermissions) {
+  const permiso = await permisoRepo.findOne({ where: { nombre: permisoName } });
+  
+  if (permiso) {
+    const assignment = permisoRolRepo.create({
+      permiso: { id_permiso: permiso.id_permiso },
+      rol: { id_rol: empleadoRolId },
+    });
+    await permisoRolRepo.save(assignment);
+  }
+}
+```
+
+## Access Control Middleware
+
+You can implement permission-based middleware using this junction table:
+
+```typescript
+import { RequestHandler } from "express";
+import { AppDataSource } from "../data-source";
+import { PermisoRol } from "../models/PermisoRol";
+
+export const requirePermiso = (permisoNombre: string): RequestHandler => {
+  return async (req, res, next) => {
+    const user = req.user; // From verifyToken middleware
+    
+    const permisoRolRepo = AppDataSource.getRepository(PermisoRol);
+    
+    const hasPermission = await permisoRolRepo.findOne({
+      where: {
+        rol: { id_rol: user.id_rol },
+        permiso: { nombre: permisoNombre },
+      },
+      relations: ["permiso"],
+    });
+    
+    if (!hasPermission) {
+      return res.status(403).json({
+        success: false,
+        message: `Permiso requerido: ${permisoNombre}`,
+      });
+    }
+    
+    next();
+  };
+};
+
+// Usage in routes:
+import { requirePermiso } from "../middlewares/requirePermiso.middleware";
+
+ventaRouter.delete("/:id", requirePermiso("eliminar_venta"), deleteVenta);
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Seed Permissions" icon="seedling">
+    Pre-populate permissions during database seeding for consistent access control
+  </Card>
+  <Card title="Role Hierarchy" icon="layer-group">
+    Design roles hierarchically (Admin → Empleado → Cliente) with appropriate permissions
+  </Card>
+  <Card title="Check Duplicates" icon="copy">
+    Always check for existing assignments before creating new ones to avoid duplicates
+  </Card>
+  <Card title="Cascade Carefully" icon="triangle-exclamation">
+    Be cautious when deleting roles or permissions - it affects all assignments
+  </Card>
+</CardGroup>
+
+<Tip>
+Use descriptive permission names like "crear_usuario", "ver_ventas", "eliminar_cliente" to make access control logic clear and maintainable.
+</Tip>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Permissions API" icon="key" href="/api/permisos/overview">
+    Manage available permissions
+  </Card>
+  <Card title="Roles API" icon="users-gear" href="/api/roles/overview">
+    Manage user roles
+  </Card>
+  <Card title="Authentication" icon="shield" href="/concepts/authentication">
+    Learn about the auth system
+  </Card>
+  <Card title="Users API" icon="user" href="/api/usuarios/overview">
+    Assign roles to users
+  </Card>
+</CardGroup>

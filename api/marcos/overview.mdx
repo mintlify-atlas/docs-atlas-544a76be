@@ -1,0 +1,387 @@
+---
+title: "Marcos API"
+description: "API reference for eyewear frame (marco) management endpoints"
+---
+
+# Marcos API
+
+The **Marco** entity represents eyewear frames in the system. Frames can be associated with sale details (DetalleVenta) and have pricing information for assembly.
+
+## Entity Overview
+
+Frames are inventory items that track:
+- Unique frame codes and identifiers
+- Frame specifications (colilla)
+- Assembly pricing
+- Active/inactive status
+- Association with sale line items
+
+## Entity Schema
+
+```typescript title="src/models/Marco.ts" lines
+@Entity("marco")
+export class Marco {
+  @PrimaryGeneratedColumn()
+  id_marco!: number;
+
+  @Column({ unique: true })
+  codigo!: string;
+
+  @Column()
+  colilla!: string;
+
+  @Column({ type: "decimal", precision: 10, scale: 2 })
+  precio_ensamblado!: number;
+
+  @Column({ type: "boolean" })
+  estado!: boolean;
+
+  @OneToMany(() => DetalleVenta, (x) => x.marco)
+  detallesVenta!: DetalleVenta[];
+}
+```
+
+### Schema Fields
+
+<ResponseField name="id_marco" type="number">
+  Auto-generated primary key
+</ResponseField>
+
+<ResponseField name="codigo" type="string">
+  Unique frame code/identifier
+</ResponseField>
+
+<ResponseField name="colilla" type="string">
+  Frame specifications or model information
+</ResponseField>
+
+<ResponseField name="precio_ensamblado" type="number">
+  Assembly price (decimal with 2 decimal places)
+</ResponseField>
+
+<ResponseField name="estado" type="boolean">
+  Active status (true = active, false = inactive)
+</ResponseField>
+
+<ResponseField name="detallesVenta" type="DetalleVenta[]">
+  One-to-many relationship with sale details
+</ResponseField>
+
+## API Endpoints
+
+### GET /api/marcos
+
+List all frames.
+
+**Authentication**: Required (Admin or Empleado role)
+
+**Request**:
+```bash
+curl -X GET https://api.example.com/api/marcos \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+**Response** (200):
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id_marco": 1,
+      "codigo": "FRAME-001",
+      "colilla": "Metal Aviator 52-18-140",
+      "precio_ensamblado": 45.00,
+      "estado": true
+    },
+    {
+      "id_marco": 2,
+      "codigo": "FRAME-002",
+      "colilla": "Plastic Wayfarer 50-20-145",
+      "precio_ensamblado": 35.00,
+      "estado": true
+    }
+  ]
+}
+```
+
+### GET /api/marcos/:id
+
+Get a specific frame by ID.
+
+**Authentication**: Required (Admin or Empleado role)
+
+**Request**:
+```bash
+curl -X GET https://api.example.com/api/marcos/1 \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+**Response** (200):
+```json
+{
+  "success": true,
+  "data": {
+    "id_marco": 1,
+    "codigo": "FRAME-001",
+    "colilla": "Metal Aviator 52-18-140",
+    "precio_ensamblado": 45.00,
+    "estado": true
+  }
+}
+```
+
+**Error Response** (404):
+```json
+{
+  "success": false,
+  "message": "Marco no encontrado"
+}
+```
+
+### POST /api/marcos
+
+Create a new frame.
+
+**Authentication**: Required (Admin or Empleado role)
+
+**Request**:
+```bash
+curl -X POST https://api.example.com/api/marcos \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -d '{
+    "codigo": "FRAME-003",
+    "colilla": "Titanium Round 48-22-140",
+    "precio_ensamblado": 55.00,
+    "estado": true
+  }'
+```
+
+**Request Body**:
+
+<ParamField path="codigo" type="string" required>
+  Unique frame code (must be unique across all frames)
+</ParamField>
+
+<ParamField path="colilla" type="string" required>
+  Frame specifications or model description
+</ParamField>
+
+<ParamField path="precio_ensamblado" type="number" required>
+  Assembly price (e.g., 45.00)
+</ParamField>
+
+<ParamField path="estado" type="boolean" default="true">
+  Active status (defaults to true if not provided)
+</ParamField>
+
+**Response** (201):
+```json
+{
+  "success": true,
+  "message": "Marco creado exitosamente",
+  "data": {
+    "id_marco": 3,
+    "codigo": "FRAME-003",
+    "colilla": "Titanium Round 48-22-140",
+    "precio_ensamblado": 55.00,
+    "estado": true
+  }
+}
+```
+
+**Error Responses**:
+
+- **400 Bad Request** - Missing required fields
+  ```json
+  {
+    "success": false,
+    "message": "Campos requeridos: codigo, colilla, precio_ensamblado"
+  }
+  ```
+
+- **409 Conflict** - Duplicate codigo
+  ```json
+  {
+    "success": false,
+    "message": "El codigo ya existe"
+  }
+  ```
+
+### PUT /api/marcos/:id
+
+Update an existing frame.
+
+**Authentication**: Required (Admin or Empleado role)
+
+**Request**:
+```bash
+curl -X PUT https://api.example.com/api/marcos/1 \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -d '{
+    "precio_ensamblado": 50.00
+  }'
+```
+
+**Request Body** (all fields optional):
+
+<ParamField path="codigo" type="string">
+  Updated frame code
+</ParamField>
+
+<ParamField path="colilla" type="string">
+  Updated frame specifications
+</ParamField>
+
+<ParamField path="precio_ensamblado" type="number">
+  Updated assembly price
+</ParamField>
+
+**Response** (200):
+```json
+{
+  "success": true,
+  "message": "Marco actualizado",
+  "data": {
+    "id_marco": 1,
+    "codigo": "FRAME-001",
+    "colilla": "Metal Aviator 52-18-140",
+    "precio_ensamblado": 50.00,
+    "estado": true
+  }
+}
+```
+
+### DELETE /api/marcos/:id
+
+Delete a frame.
+
+**Authentication**: Required (Admin or Empleado role)
+
+<Warning>
+Cannot delete a frame if it's referenced by existing sale details (DetalleVenta). Remove or reassign those records first.
+</Warning>
+
+**Request**:
+```bash
+curl -X DELETE https://api.example.com/api/marcos/3 \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+**Response** (200):
+```json
+{
+  "success": true,
+  "message": "Marco eliminado"
+}
+```
+
+**Error Response** (409 Conflict):
+```json
+{
+  "success": false,
+  "message": "No se puede eliminar: existen DetalleVenta asociados (3)"
+}
+```
+
+### PATCH /api/marcos/:id/toggle-estado
+
+Toggle frame active/inactive status.
+
+**Authentication**: Required (Admin or Empleado role)
+
+**Request**:
+```bash
+curl -X PATCH https://api.example.com/api/marcos/1/toggle-estado \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+**Response** (200):
+```json
+{
+  "success": true,
+  "message": "Estado cambiado a false",
+  "data": {
+    "id_marco": 1,
+    "codigo": "FRAME-001",
+    "colilla": "Metal Aviator 52-18-140",
+    "precio_ensamblado": 50.00,
+    "estado": false
+  }
+}
+```
+
+## Common Use Cases
+
+### List Active Frames
+
+```typescript
+const marcoRepo = AppDataSource.getRepository(Marco);
+const activeFrames = await marcoRepo.find({
+  where: { estado: true },
+  order: { codigo: "ASC" },
+});
+```
+
+### Get Frame with Sale Details
+
+```typescript
+const marcoRepo = AppDataSource.getRepository(Marco);
+const marco = await marcoRepo.findOne({
+  where: { id_marco: 1 },
+  relations: ["detallesVenta", "detallesVenta.venta"],
+});
+
+console.log(`Frame ${marco.codigo} used in ${marco.detallesVenta.length} sales`);
+```
+
+### Calculate Total Revenue by Frame
+
+```typescript
+const detalleVentaRepo = AppDataSource.getRepository(DetalleVenta);
+const details = await detalleVentaRepo.find({
+  where: { marco: { id_marco: 1 } },
+});
+
+const totalRevenue = details.reduce((sum, detail) => sum + Number(detail.precio), 0);
+console.log(`Total revenue for frame: $${totalRevenue}`);
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Unique Codes" icon="barcode">
+    Always use unique, descriptive frame codes for easy inventory tracking
+  </Card>
+  <Card title="Soft Delete" icon="toggle-on">
+    Use the estado toggle instead of deleting frames to preserve sales history
+  </Card>
+  <Card title="Price Updates" icon="dollar-sign">
+    Update prices carefully - existing sales retain their original prices
+  </Card>
+  <Card title="Validate Dependencies" icon="link">
+    Check for associated sale details before deleting frames
+  </Card>
+</CardGroup>
+
+<Tip>
+Use descriptive colilla values (e.g., "Metal Aviator 52-18-140") to include frame type, material, and dimensions for easy identification.
+</Tip>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Sale Details API" icon="list" href="/api/detalle-venta/overview">
+    Learn how frames are used in sales
+  </Card>
+  <Card title="Sales API" icon="shopping-cart" href="/api/ventas/overview">
+    Explore the complete sales workflow
+  </Card>
+  <Card title="Services API" icon="wrench" href="/api/servicios/overview">
+    Manage optical services
+  </Card>
+  <Card title="Inventory Management" icon="boxes" href="/concepts/architecture">
+    Understand the system architecture
+  </Card>
+</CardGroup>

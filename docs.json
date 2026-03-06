@@ -84,7 +84,8 @@
             "pages": [
               "api/usuarios/overview",
               "api/roles/overview",
-              "api/permisos/overview"
+              "api/permisos/overview",
+              "api/permiso-rol/overview"
             ]
           },
           {
@@ -93,7 +94,10 @@
               "api/clientes/overview",
               "api/citas/overview",
               "api/servicios/overview",
-              "api/ventas/overview"
+              "api/ventas/overview",
+              "api/marcos/overview",
+              "api/detalle-venta/overview",
+              "api/pagos/overview"
             ]
           },
           {
