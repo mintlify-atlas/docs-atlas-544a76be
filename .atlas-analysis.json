@@ -1,0 +1,130 @@
+{
+  "projectType": "cli-tool",
+  "projectName": "Softwart Backend",
+  "projectDescription": "A CLI tool and TypeScript framework for generating Express + TypeORM backend applications with MVC architecture and auto-generated CRUD operations.",
+  "theme": "aspen",
+  "primaryColor": "#2563eb",
+  "lightColor": "#60a5fa",
+  "darkColor": "#1e40af",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "CLI Commands",
+            "pages": [
+              "cli/create-app",
+              "cli/generate-models",
+              "cli/generate-controllers",
+              "cli/generate-routes"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/architecture",
+              "concepts/mvc-structure",
+              "concepts/typeorm-integration",
+              "concepts/authentication"
+            ]
+          },
+          {
+            "group": "Generated Code",
+            "pages": [
+              "generated/models",
+              "generated/controllers",
+              "generated/routes",
+              "generated/middlewares"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/database",
+              "configuration/environment",
+              "configuration/security"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Authentication",
+            "pages": [
+              "api/auth/registro",
+              "api/auth/login",
+              "api/auth/perfil"
+            ]
+          },
+          {
+            "group": "User Management",
+            "pages": [
+              "api/usuarios/overview",
+              "api/roles/overview",
+              "api/permisos/overview"
+            ]
+          },
+          {
+            "group": "Business Entities",
+            "pages": [
+              "api/clientes/overview",
+              "api/citas/overview",
+              "api/servicios/overview",
+              "api/ventas/overview"
+            ]
+          },
+          {
+            "group": "Catalog Entities",
+            "pages": [
+              "api/catalogs/estados",
+              "api/catalogs/metodos-pago"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "CLI scaffolding tool for Express + TypeORM backends",
+    "Auto-generated TypeORM models with relations",
+    "Auto-generated controllers with full CRUD operations",
+    "Auto-generated REST API routes",
+    "Built-in JWT authentication and role-based authorization",
+    "Rate limiting and CORS middleware",
+    "PostgreSQL database integration",
+    "MVC architecture pattern",
+    "Error handling system with custom error classes",
+    "Database seeding support"
+  ],
+  "publicApiSurface": [
+    "create-backend-app [project-name] - Create a new backend project",
+    "generate-model.js - Generate TypeORM entity models",
+    "generate-controllers.js - Generate Express controllers",
+    "generate-routes.js - Generate API route definitions",
+    "POST /api/auth/registro - User registration",
+    "POST /api/auth/login - User authentication",
+    "GET /api/auth/perfil - Get user profile",
+    "GET /api/usuarios - List all users",
+    "POST /api/usuarios - Create user",
+    "GET /api/clientes - List all clients",
+    "POST /api/clientes - Create client",
+    "GET /api/citas - List all appointments",
+    "POST /api/citas - Create appointment",
+    "GET /api/ventas - List all sales",
+    "POST /api/ventas - Create sale",
+    "GET /api/servicios - List all services",
+    "GET /api/roles - List all roles",
+    "GET /api/permisos - List all permissions"
+  ]
+}
