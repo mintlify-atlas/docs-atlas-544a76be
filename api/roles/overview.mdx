@@ -1,0 +1,421 @@
+---
+title: 'Roles API'
+description: 'API endpoints for managing user roles and permissions'
+---
+
+## Authentication
+
+All Rol endpoints require authentication. Include a valid JWT token in the Authorization header.
+
+## List All Roles
+
+<api>GET /api/rol</api>
+
+Retrieves a list of all roles in the system.
+
+### Headers
+
+<ParamField header="Authorization" type="string" required>
+  Bearer token for authentication
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Indicates if the request was successful
+</ResponseField>
+
+<ResponseField name="data" type="array">
+  Array of role objects
+  
+  <ResponseField name="id_rol" type="number">
+    Unique identifier for the role
+  </ResponseField>
+  
+  <ResponseField name="nombre" type="string">
+    Role name
+  </ResponseField>
+  
+  <ResponseField name="estado" type="boolean">
+    Role's active status (true = active, false = inactive)
+  </ResponseField>
+</ResponseField>
+
+<ResponseExample>
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id_rol": 1,
+      "nombre": "Administrador",
+      "estado": true
+    },
+    {
+      "id_rol": 2,
+      "nombre": "Usuario",
+      "estado": true
+    }
+  ]
+}
+```
+</ResponseExample>
+
+---
+
+## Get Role by ID
+
+<api>GET /api/rol/:id</api>
+
+Retrieves a specific role by its ID.
+
+### Path Parameters
+
+<ParamField path="id" type="number" required>
+  The unique identifier of the role
+</ParamField>
+
+### Headers
+
+<ParamField header="Authorization" type="string" required>
+  Bearer token for authentication
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Indicates if the request was successful
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  Role object
+  
+  <ResponseField name="id_rol" type="number">
+    Unique identifier for the role
+  </ResponseField>
+  
+  <ResponseField name="nombre" type="string">
+    Role name
+  </ResponseField>
+  
+  <ResponseField name="estado" type="boolean">
+    Role's active status
+  </ResponseField>
+</ResponseField>
+
+<ResponseExample>
+```json
+{
+  "success": true,
+  "data": {
+    "id_rol": 1,
+    "nombre": "Administrador",
+    "estado": true
+  }
+}
+```
+</ResponseExample>
+
+### Error Responses
+
+<ResponseField name="404" type="object">
+  Role not found
+  
+  ```json
+  {
+    "success": false,
+    "message": "Rol no encontrado"
+  }
+  ```
+</ResponseField>
+
+---
+
+## Create Role
+
+<api>POST /api/rol</api>
+
+Creates a new role in the system.
+
+### Headers
+
+<ParamField header="Authorization" type="string" required>
+  Bearer token for authentication
+</ParamField>
+
+<ParamField header="Content-Type" type="string" required>
+  application/json
+</ParamField>
+
+### Body Parameters
+
+<ParamField body="nombre" type="string" required>
+  Role name
+</ParamField>
+
+<ParamField body="estado" type="boolean" optional default="true">
+  Role's active status (defaults to true)
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Indicates if the request was successful
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Success message
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  Created role object
+</ResponseField>
+
+<ResponseExample>
+```json Request
+{
+  "nombre": "Manager",
+  "estado": true
+}
+```
+
+```json Response (201 Created)
+{
+  "success": true,
+  "message": "Rol creado exitosamente",
+  "data": {
+    "id_rol": 3,
+    "nombre": "Manager",
+    "estado": true
+  }
+}
+```
+</ResponseExample>
+
+### Error Responses
+
+<ResponseField name="400" type="object">
+  Missing required fields
+  
+  ```json
+  {
+    "success": false,
+    "message": "Campos requeridos: nombre"
+  }
+  ```
+</ResponseField>
+
+---
+
+## Update Role
+
+<api>PUT /api/rol/:id</api>
+
+Updates an existing role's information.
+
+### Path Parameters
+
+<ParamField path="id" type="number" required>
+  The unique identifier of the role to update
+</ParamField>
+
+### Headers
+
+<ParamField header="Authorization" type="string" required>
+  Bearer token for authentication
+</ParamField>
+
+<ParamField header="Content-Type" type="string" required>
+  application/json
+</ParamField>
+
+### Body Parameters
+
+<ParamField body="nombre" type="string" optional>
+  Role name
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Indicates if the request was successful
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Success message
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  Updated role object
+</ResponseField>
+
+<ResponseExample>
+```json Request
+{
+  "nombre": "Senior Manager"
+}
+```
+
+```json Response
+{
+  "success": true,
+  "message": "Rol actualizado",
+  "data": {
+    "id_rol": 3,
+    "nombre": "Senior Manager",
+    "estado": true
+  }
+}
+```
+</ResponseExample>
+
+### Error Responses
+
+<ResponseField name="404" type="object">
+  Role not found
+  
+  ```json
+  {
+    "success": false,
+    "message": "Rol no encontrado"
+  }
+  ```
+</ResponseField>
+
+---
+
+## Delete Role
+
+<api>DELETE /api/rol/:id</api>
+
+Permanently deletes a role from the system.
+
+### Path Parameters
+
+<ParamField path="id" type="number" required>
+  The unique identifier of the role to delete
+</ParamField>
+
+### Headers
+
+<ParamField header="Authorization" type="string" required>
+  Bearer token for authentication
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Indicates if the request was successful
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Success message
+</ResponseField>
+
+<ResponseExample>
+```json
+{
+  "success": true,
+  "message": "Rol eliminado correctamente"
+}
+```
+</ResponseExample>
+
+### Error Responses
+
+<ResponseField name="404" type="object">
+  Role not found
+  
+  ```json
+  {
+    "success": false,
+    "message": "Rol no encontrado"
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="409" type="object">
+  Role has associated records and cannot be deleted
+  
+  ```json
+  {
+    "success": false,
+    "message": "No se puede eliminar: existen Usuario asociados (5)"
+  }
+  ```
+</ResponseField>
+
+<Warning>
+A role cannot be deleted if:
+- It has associated PermisoRol records (role-permission assignments)
+- It has associated Usuario records (users assigned to this role)
+
+Consider using the toggle estado endpoint to deactivate roles instead.
+</Warning>
+
+---
+
+## Toggle Role Status
+
+<api>PATCH /api/rol/:id/toggle-estado</api>
+
+Toggles the active status of a role (active/inactive).
+
+### Path Parameters
+
+<ParamField path="id" type="number" required>
+  The unique identifier of the role
+</ParamField>
+
+### Headers
+
+<ParamField header="Authorization" type="string" required>
+  Bearer token for authentication
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Indicates if the request was successful
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Success message indicating whether the role was activated or deactivated
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  Object containing the new status
+  
+  <ResponseField name="estado" type="boolean">
+    The new active status
+  </ResponseField>
+</ResponseField>
+
+<ResponseExample>
+```json
+{
+  "success": true,
+  "message": "Rol activado",
+  "data": {
+    "estado": true
+  }
+}
+```
+</ResponseExample>
+
+### Error Responses
+
+<ResponseField name="404" type="object">
+  Role not found
+  
+  ```json
+  {
+    "success": false,
+    "message": "Rol no encontrado"
+  }
+  ```
+</ResponseField>
+
+<Tip>
+This is the recommended way to deactivate roles instead of deleting them, as it preserves data integrity and prevents cascading deletion issues.
+</Tip>

@@ -1,0 +1,173 @@
+---
+title: 'create-app'
+description: 'Create a new Node.js backend project with Express'
+icon: 'folder-plus'
+---
+
+## Overview
+
+The `create-app` command scaffolds a complete Node.js backend project with a standard Express.js directory structure.
+
+## Command Syntax
+
+```bash
+node bin.js [project-name]
+```
+
+<ParamField path="project-name" type="string" default="project-root">
+  Name of the project directory to create. Defaults to "project-root" if not specified.
+</ParamField>
+
+## What It Creates
+
+The generator creates the following directory structure:
+
+```
+project-name/
+├── src/
+│   ├── config/
+│   ├── controllers/
+│   ├── services/
+│   ├── models/
+│   ├── routes/
+│   ├── middlewares/
+│   ├── utils/
+│   ├── errors/
+│   ├── validators/
+│   ├── app.js
+│   └── server.js
+├── tests/
+├── .env
+├── .gitignore
+├── package.json
+└── README.md
+```
+
+## Generated Files
+
+### src/app.js
+
+The main Express application with global middlewares:
+
+```javascript
+const express = require("express");
+const app = express();
+
+// Middlewares globales
+app.use(express.json());
+
+module.exports = app;
+```
+
+### src/server.js
+
+The server entry point that starts the application:
+
+```javascript
+const app = require("./app");
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log(`Servidor corriendo en puerto ${PORT}`);
+});
+```
+
+### .env
+
+Environment configuration file:
+
+```bash
+PORT=3000
+DB_URI=mongodb://localhost:27017/project-name
+```
+
+### package.json
+
+Package configuration with essential dependencies:
+
+```json
+{
+  "name": "project-name",
+  "version": "1.0.0",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.0"
+  }
+}
+```
+
+## Usage Examples
+
+<Steps>
+  <Step title="Create with default name">
+    ```bash
+    node bin.js
+    ```
+    Creates a project named `project-root` in the current directory.
+  </Step>
+
+  <Step title="Create with custom name">
+    ```bash
+    node bin.js my-backend-api
+    ```
+    Creates a project named `my-backend-api`.
+  </Step>
+
+  <Step title="Install dependencies">
+    ```bash
+    cd my-backend-api
+    npm install
+    ```
+  </Step>
+
+  <Step title="Start development">
+    ```bash
+    npm run dev
+    ```
+    Starts the server with nodemon for hot reloading.
+  </Step>
+</Steps>
+
+## Output
+
+When successful, you'll see:
+
+```bash
+✅ Proyecto my-backend-api creado con éxito en /path/to/my-backend-api
+```
+
+## Directory Purpose
+
+| Directory | Purpose |
+|-----------|----------|
+| **src/config/** | Database and application configuration |
+| **src/controllers/** | Request handlers and business logic |
+| **src/services/** | Business logic and external API calls |
+| **src/models/** | Database models and schemas |
+| **src/routes/** | API route definitions |
+| **src/middlewares/** | Custom Express middlewares |
+| **src/utils/** | Utility functions and helpers |
+| **src/errors/** | Error classes and error handling |
+| **src/validators/** | Input validation schemas |
+| **tests/** | Unit and integration tests |
+
+## Next Steps
+
+After creating your project:
+
+1. Install dependencies: `npm install`
+2. Generate models: `node generate-model.js`
+3. Generate controllers: `node generate-controllers.js`
+4. Generate routes: `node generate-routes.js`
+5. Start development: `npm run dev`
+
+<Note>
+The generated `.gitignore` automatically excludes `node_modules` and `.env` from version control.
+</Note>

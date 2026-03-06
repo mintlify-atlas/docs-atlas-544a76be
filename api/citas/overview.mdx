@@ -1,0 +1,370 @@
+---
+title: "Citas API"
+description: "Manage customer appointments and scheduling"
+---
+
+## Overview
+
+The Citas (Appointments) API allows you to manage customer appointments in the Softwart system. Appointments connect customers with specific dates/times and can be linked to sales transactions.
+
+## Entity Schema
+
+### Cita Model
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id_cita` | number | Auto | Primary key, auto-generated |
+| `fecha` | date | Yes | Appointment date (YYYY-MM-DD) |
+| `hora` | time | Yes | Appointment time (HH:MM:SS) |
+| `id_estado_cita` | number | No | Foreign key to EstadoCita |
+| `id_cliente` | number | No | Foreign key to Cliente |
+
+### Relationships
+
+- **Many-to-One with EstadoCita**: Each appointment has one status (e.g., Pending, Confirmed, Completed, Cancelled)
+- **Many-to-One with Cliente**: Each appointment belongs to one customer
+- **One-to-One with Venta**: An appointment can have one associated sale
+
+<Info>
+When fetching appointments, related `estadoCita` and `cliente` entities are automatically included in the response.
+</Info>
+
+<Note>
+Deleting an appointment is only allowed if there are no associated Ventas. The API will return a 409 Conflict error if dependencies exist.
+</Note>
+
+## Authentication
+
+<Warning>
+All Cita endpoints require authentication and role-based authorization.
+</Warning>
+
+**Required Roles**: `Admin` or `Empleado`
+
+**Headers**:
+```json
+{
+  "Authorization": "Bearer YOUR_JWT_TOKEN"
+}
+```
+
+## Endpoints
+
+### List All Appointments
+
+```http
+GET /api/citas
+```
+
+Retrieves all appointments with related customer and status information.
+
+**Response** (200 OK):
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id_cita": 1,
+      "fecha": "2026-03-10",
+      "hora": "10:30:00",
+      "estadoCita": {
+        "id_estado_cita": 1,
+        "nombre": "Confirmada"
+      },
+      "cliente": {
+        "id_cliente": 5,
+        "nombre": "Juan Pérez",
+        "correo": "juan.perez@example.com",
+        "telefono": "987654321"
+      }
+    }
+  ]
+}
+```
+
+### Get Appointment by ID
+
+```http
+GET /api/citas/:id
+```
+
+Retrieves a specific appointment by its ID with related entities.
+
+**Parameters**:
+- `id` (path parameter): Appointment ID
+
+**Response** (200 OK):
+```json
+{
+  "success": true,
+  "data": {
+    "id_cita": 1,
+    "fecha": "2026-03-10",
+    "hora": "10:30:00",
+    "estadoCita": {
+      "id_estado_cita": 1,
+      "nombre": "Confirmada"
+    },
+    "cliente": {
+      "id_cliente": 5,
+      "nombre": "Juan Pérez",
+      "correo": "juan.perez@example.com",
+      "telefono": "987654321"
+    }
+  }
+}
+```
+
+**Error Response** (404 Not Found):
+```json
+{
+  "success": false,
+  "message": "Cita no encontrado"
+}
+```
+
+### Create Appointment
+
+```http
+POST /api/citas
+```
+
+Creates a new appointment.
+
+**Request Body**:
+```json
+{
+  "fecha": "2026-03-10",
+  "hora": "10:30:00",
+  "id_estado_cita": 1,
+  "id_cliente": 5
+}
+```
+
+**Required Fields**: `fecha`, `hora`
+
+**Optional Fields**: `id_estado_cita`, `id_cliente`
+
+**Response** (201 Created):
+```json
+{
+  "success": true,
+  "message": "Cita creado exitosamente",
+  "data": {
+    "id_cita": 1,
+    "fecha": "2026-03-10",
+    "hora": "10:30:00",
+    "estadoCita": {
+      "id_estado_cita": 1,
+      "nombre": "Confirmada"
+    },
+    "cliente": {
+      "id_cliente": 5,
+      "nombre": "Juan Pérez"
+    }
+  }
+}
+```
+
+**Error Response** (400 Bad Request):
+```json
+{
+  "success": false,
+  "message": "Campos requeridos: fecha, hora"
+}
+```
+
+**Error Response** (404 Not Found - Invalid Relations):
+```json
+{
+  "success": false,
+  "message": "EstadoCita no encontrado"
+}
+```
+```json
+{
+  "success": false,
+  "message": "Cliente no encontrado"
+}
+```
+
+### Update Appointment
+
+```http
+PUT /api/citas/:id
+```
+
+Updates an existing appointment. Only provided fields will be updated.
+
+**Parameters**:
+- `id` (path parameter): Appointment ID
+
+**Request Body** (all fields optional):
+```json
+{
+  "fecha": "2026-03-11",
+  "hora": "14:00:00",
+  "id_estado_cita": 2,
+  "id_cliente": 5
+}
+```
+
+**Response** (200 OK):
+```json
+{
+  "success": true,
+  "message": "Cita actualizado",
+  "data": {
+    "id_cita": 1,
+    "fecha": "2026-03-11",
+    "hora": "14:00:00",
+    "estadoCita": {
+      "id_estado_cita": 2,
+      "nombre": "Completada"
+    },
+    "cliente": {
+      "id_cliente": 5,
+      "nombre": "Juan Pérez"
+    }
+  }
+}
+```
+
+### Delete Appointment
+
+```http
+DELETE /api/citas/:id
+```
+
+Deletes an appointment. Only allowed if there are no associated sales.
+
+**Parameters**:
+- `id` (path parameter): Appointment ID
+
+**Response** (200 OK):
+```json
+{
+  "success": true,
+  "message": "Cita eliminado correctamente"
+}
+```
+
+**Error Response** (409 Conflict):
+```json
+{
+  "success": false,
+  "message": "No se puede eliminar: existen Venta asociados (1)"
+}
+```
+
+## Usage Examples
+
+### Creating an Appointment with cURL
+
+```bash
+curl -X POST https://api.softwart.com/api/citas \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "fecha": "2026-03-15",
+    "hora": "15:00:00",
+    "id_estado_cita": 1,
+    "id_cliente": 8
+  }'
+```
+
+### Fetching Today's Appointments
+
+```javascript
+const response = await fetch('https://api.softwart.com/api/citas', {
+  headers: {
+    'Authorization': `Bearer ${token}`
+  }
+});
+
+const result = await response.json();
+if (result.success) {
+  const today = new Date().toISOString().split('T')[0];
+  const todayAppointments = result.data.filter(
+    cita => cita.fecha === today
+  );
+  console.log('Today\'s appointments:', todayAppointments);
+}
+```
+
+### Updating Appointment Status
+
+```javascript
+const response = await fetch('https://api.softwart.com/api/citas/1', {
+  method: 'PUT',
+  headers: {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    id_estado_cita: 2 // Update to "Completada"
+  })
+});
+
+const result = await response.json();
+console.log(result.message); // "Cita actualizado"
+```
+
+### Reschedule an Appointment
+
+```javascript
+const reschedule = async (citaId, newFecha, newHora) => {
+  const response = await fetch(`https://api.softwart.com/api/citas/${citaId}`, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      fecha: newFecha,
+      hora: newHora
+    })
+  });
+  
+  return await response.json();
+};
+
+// Usage
+await reschedule(1, '2026-03-20', '11:00:00');
+```
+
+## Estado Cita (Appointment Status)
+
+Appointments can have different statuses. Common status values include:
+
+- **Pendiente**: Appointment requested but not confirmed
+- **Confirmada**: Appointment confirmed by staff
+- **Completada**: Appointment completed
+- **Cancelada**: Appointment cancelled
+- **No asistió**: Customer did not show up
+
+<Tip>
+Use the [EstadoCita API](/api/estados/estado-cita) to manage available appointment statuses.
+</Tip>
+
+## Error Responses
+
+All endpoints may return the following error responses:
+
+| Status Code | Description |
+|-------------|-------------|
+| 400 | Bad Request - Missing required fields |
+| 401 | Unauthorized - Missing or invalid token |
+| 403 | Forbidden - Insufficient permissions |
+| 404 | Not Found - Appointment or related entity doesn't exist |
+| 409 | Conflict - Cannot delete due to dependencies |
+| 500 | Internal Server Error |
+
+**Generic Error Format**:
+```json
+{
+  "success": false,
+  "message": "Error description",
+  "error": {} // Additional error details (dev mode only)
+}
+```

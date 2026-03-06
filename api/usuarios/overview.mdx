@@ -1,0 +1,481 @@
+---
+title: 'Usuarios API'
+description: 'API endpoints for managing users in the system'
+---
+
+## Authentication
+
+All Usuario endpoints require authentication. Include a valid JWT token in the Authorization header.
+
+## List All Users
+
+<api>GET /api/usuario</api>
+
+Retrieves a list of all users in the system.
+
+### Headers
+
+<ParamField header="Authorization" type="string" required>
+  Bearer token for authentication
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Indicates if the request was successful
+</ResponseField>
+
+<ResponseField name="data" type="array">
+  Array of user objects
+  
+  <ResponseField name="id_usuario" type="number">
+    Unique identifier for the user
+  </ResponseField>
+  
+  <ResponseField name="correo" type="string">
+    User's email address (unique)
+  </ResponseField>
+  
+  <ResponseField name="estado" type="boolean">
+    User's active status (true = active, false = inactive)
+  </ResponseField>
+  
+  <ResponseField name="rol" type="object">
+    Associated role object
+    
+    <ResponseField name="id_rol" type="number">
+      Role ID
+    </ResponseField>
+    
+    <ResponseField name="nombre" type="string">
+      Role name
+    </ResponseField>
+    
+    <ResponseField name="estado" type="boolean">
+      Role active status
+    </ResponseField>
+  </ResponseField>
+</ResponseField>
+
+<ResponseExample>
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id_usuario": 1,
+      "correo": "admin@softwart.com",
+      "estado": true,
+      "rol": {
+        "id_rol": 1,
+        "nombre": "Administrador",
+        "estado": true
+      }
+    }
+  ]
+}
+```
+</ResponseExample>
+
+<Note>
+The password field (clave) is never returned in API responses for security reasons.
+</Note>
+
+---
+
+## Get User by ID
+
+<api>GET /api/usuario/:id</api>
+
+Retrieves a specific user by their ID.
+
+### Path Parameters
+
+<ParamField path="id" type="number" required>
+  The unique identifier of the user
+</ParamField>
+
+### Headers
+
+<ParamField header="Authorization" type="string" required>
+  Bearer token for authentication
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Indicates if the request was successful
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  User object
+  
+  <ResponseField name="id_usuario" type="number">
+    Unique identifier for the user
+  </ResponseField>
+  
+  <ResponseField name="correo" type="string">
+    User's email address
+  </ResponseField>
+  
+  <ResponseField name="estado" type="boolean">
+    User's active status
+  </ResponseField>
+  
+  <ResponseField name="rol" type="object">
+    Associated role object
+  </ResponseField>
+</ResponseField>
+
+<ResponseExample>
+```json
+{
+  "success": true,
+  "data": {
+    "id_usuario": 1,
+    "correo": "admin@softwart.com",
+    "estado": true,
+    "rol": {
+      "id_rol": 1,
+      "nombre": "Administrador",
+      "estado": true
+    }
+  }
+}
+```
+</ResponseExample>
+
+### Error Responses
+
+<ResponseField name="404" type="object">
+  User not found
+  
+  ```json
+  {
+    "success": false,
+    "message": "Usuario no encontrado"
+  }
+  ```
+</ResponseField>
+
+---
+
+## Create User
+
+<api>POST /api/usuario</api>
+
+Creates a new user in the system.
+
+### Headers
+
+<ParamField header="Authorization" type="string" required>
+  Bearer token for authentication
+</ParamField>
+
+<ParamField header="Content-Type" type="string" required>
+  application/json
+</ParamField>
+
+### Body Parameters
+
+<ParamField body="correo" type="string" required>
+  User's email address (must be unique)
+</ParamField>
+
+<ParamField body="clave" type="string" required>
+  User's password (will be hashed using bcrypt)
+</ParamField>
+
+<ParamField body="id_rol" type="number" optional>
+  ID of the role to assign to the user
+</ParamField>
+
+<ParamField body="estado" type="boolean" optional default="true">
+  User's active status (defaults to true)
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Indicates if the request was successful
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Success message
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  Created user object (without password)
+</ResponseField>
+
+<ResponseExample>
+```json Request
+{
+  "correo": "user@example.com",
+  "clave": "SecurePassword123",
+  "id_rol": 2,
+  "estado": true
+}
+```
+
+```json Response (201 Created)
+{
+  "success": true,
+  "message": "Usuario creado exitosamente",
+  "data": {
+    "id_usuario": 5,
+    "correo": "user@example.com",
+    "estado": true,
+    "rol": {
+      "id_rol": 2,
+      "nombre": "Usuario",
+      "estado": true
+    }
+  }
+}
+```
+</ResponseExample>
+
+### Error Responses
+
+<ResponseField name="400" type="object">
+  Missing required fields
+  
+  ```json
+  {
+    "success": false,
+    "message": "Campos requeridos: correo, clave"
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="404" type="object">
+  Role not found
+  
+  ```json
+  {
+    "success": false,
+    "message": "Rol no encontrado"
+  }
+  ```
+</ResponseField>
+
+<Warning>
+Passwords are automatically hashed using bcrypt with 10 salt rounds before being stored.
+</Warning>
+
+---
+
+## Update User
+
+<api>PUT /api/usuario/:id</api>
+
+Updates an existing user's information.
+
+### Path Parameters
+
+<ParamField path="id" type="number" required>
+  The unique identifier of the user to update
+</ParamField>
+
+### Headers
+
+<ParamField header="Authorization" type="string" required>
+  Bearer token for authentication
+</ParamField>
+
+<ParamField header="Content-Type" type="string" required>
+  application/json
+</ParamField>
+
+### Body Parameters
+
+All fields are optional. Only include fields you want to update.
+
+<ParamField body="correo" type="string" optional>
+  User's email address
+</ParamField>
+
+<ParamField body="clave" type="string" optional>
+  User's new password (will be hashed)
+</ParamField>
+
+<ParamField body="id_rol" type="number" optional>
+  ID of the role to assign to the user
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Indicates if the request was successful
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Success message
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  Updated user object (without password)
+</ResponseField>
+
+<ResponseExample>
+```json Request
+{
+  "correo": "newemail@example.com",
+  "id_rol": 3
+}
+```
+
+```json Response
+{
+  "success": true,
+  "message": "Usuario actualizado",
+  "data": {
+    "id_usuario": 5,
+    "correo": "newemail@example.com",
+    "estado": true,
+    "rol": {
+      "id_rol": 3,
+      "nombre": "Manager",
+      "estado": true
+    }
+  }
+}
+```
+</ResponseExample>
+
+### Error Responses
+
+<ResponseField name="404" type="object">
+  User or role not found
+  
+  ```json
+  {
+    "success": false,
+    "message": "Usuario no encontrado"
+  }
+  ```
+</ResponseField>
+
+---
+
+## Delete User
+
+<api>DELETE /api/usuario/:id</api>
+
+Permanently deletes a user from the system.
+
+### Path Parameters
+
+<ParamField path="id" type="number" required>
+  The unique identifier of the user to delete
+</ParamField>
+
+### Headers
+
+<ParamField header="Authorization" type="string" required>
+  Bearer token for authentication
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Indicates if the request was successful
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Success message
+</ResponseField>
+
+<ResponseExample>
+```json
+{
+  "success": true,
+  "message": "Usuario eliminado correctamente"
+}
+```
+</ResponseExample>
+
+### Error Responses
+
+<ResponseField name="404" type="object">
+  User not found
+  
+  ```json
+  {
+    "success": false,
+    "message": "Usuario no encontrado"
+  }
+  ```
+</ResponseField>
+
+<Warning>
+This operation is permanent and cannot be undone. Consider using the toggle estado endpoint to deactivate users instead.
+</Warning>
+
+---
+
+## Toggle User Status
+
+<api>PATCH /api/usuario/:id/toggle-estado</api>
+
+Toggles the active status of a user (active/inactive).
+
+### Path Parameters
+
+<ParamField path="id" type="number" required>
+  The unique identifier of the user
+</ParamField>
+
+### Headers
+
+<ParamField header="Authorization" type="string" required>
+  Bearer token for authentication
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Indicates if the request was successful
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Success message indicating whether the user was activated or deactivated
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  Object containing the new status
+  
+  <ResponseField name="estado" type="boolean">
+    The new active status
+  </ResponseField>
+</ResponseField>
+
+<ResponseExample>
+```json
+{
+  "success": true,
+  "message": "Usuario inactivado",
+  "data": {
+    "estado": false
+  }
+}
+```
+</ResponseExample>
+
+### Error Responses
+
+<ResponseField name="404" type="object">
+  User not found
+  
+  ```json
+  {
+    "success": false,
+    "message": "Usuario no encontrado"
+  }
+  ```
+</ResponseField>
+
+<Tip>
+This is the recommended way to deactivate users instead of deleting them, as it preserves data integrity.
+</Tip>

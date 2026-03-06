@@ -1,0 +1,193 @@
+---
+title: 'Login'
+api: 'POST /api/auth/login'
+description: 'Autenticación de usuarios y generación de token JWT'
+---
+
+Este endpoint autentica a un usuario en el sistema y devuelve un token JWT válido por 8 horas. El token incluye información del usuario, rol y cliente asociado (si aplica).
+
+## Autenticación
+
+No requiere autenticación (endpoint público).
+
+## Cuerpo de la solicitud
+
+<ParamField body="correo" type="string" required>
+  Correo electrónico del usuario
+</ParamField>
+
+<ParamField body="clave" type="string" required>
+  Contraseña del usuario
+</ParamField>
+
+## Respuesta
+
+<ResponseField name="success" type="boolean">
+  Indica si la autenticación fue exitosa
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Mensaje de bienvenida
+</ResponseField>
+
+<ResponseField name="token" type="string">
+  Token JWT válido por 8 horas. Incluye: id_usuario, correo, id_rol, rol, id_cliente
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  Información del usuario autenticado
+  
+  <ResponseField name="id_usuario" type="number">
+    ID único del usuario
+  </ResponseField>
+  
+  <ResponseField name="correo" type="string">
+    Correo electrónico del usuario
+  </ResponseField>
+  
+  <ResponseField name="rol" type="string">
+    Nombre del rol ("Cliente", "Admin", "Empleado")
+  </ResponseField>
+  
+  <ResponseField name="id_cliente" type="number | null">
+    ID del cliente asociado (null para Admin/Empleado sin cliente)
+  </ResponseField>
+  
+  <ResponseField name="nombre" type="string | null">
+    Nombre del cliente (solo si el usuario es Cliente)
+  </ResponseField>
+</ResponseField>
+
+## Ejemplo de solicitud
+
+```bash
+curl -X POST https://api.softwart.com/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "correo": "juan.perez@example.com",
+    "clave": "MiPassword123!"
+  }'
+```
+
+```javascript
+const response = await fetch('https://api.softwart.com/api/auth/login', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    correo: 'juan.perez@example.com',
+    clave: 'MiPassword123!'
+  })
+});
+
+const data = await response.json();
+
+// Guardar el token para futuras peticiones
+if (data.success) {
+  localStorage.setItem('token', data.token);
+}
+```
+
+## Respuesta exitosa (Cliente)
+
+```json
+{
+  "success": true,
+  "message": "Bienvenido",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "data": {
+    "id_usuario": 25,
+    "correo": "juan.perez@example.com",
+    "rol": "Cliente",
+    "id_cliente": 15,
+    "nombre": "Juan Pérez"
+  }
+}
+```
+
+## Respuesta exitosa (Admin/Empleado)
+
+```json
+{
+  "success": true,
+  "message": "Bienvenido",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "data": {
+    "id_usuario": 1,
+    "correo": "admin@softwart.com",
+    "rol": "Admin",
+    "id_cliente": null,
+    "nombre": null
+  }
+}
+```
+
+## Respuestas de error
+
+<ResponseExample>
+```json 400 - Campos requeridos
+{
+  "success": false,
+  "message": "Correo y clave son requeridos"
+}
+```
+
+```json 401 - Credenciales inválidas (usuario no existe)
+{
+  "success": false,
+  "message": "Credenciales inválidas"
+}
+```
+
+```json 401 - Credenciales inválidas (contraseña incorrecta)
+{
+  "success": false,
+  "message": "Credenciales inválidas"
+}
+```
+
+```json 403 - Cuenta inactiva
+{
+  "success": false,
+  "message": "Cuenta inactiva"
+}
+```
+
+```json 500 - Error del servidor
+{
+  "success": false,
+  "message": "Error en login",
+  "error": {}
+}
+```
+</ResponseExample>
+
+## Uso del token
+
+Incluye el token en el header Authorization de tus peticiones:
+
+```bash
+curl -X GET https://api.softwart.com/api/cuenta/perfil \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+```javascript
+const token = localStorage.getItem('token');
+
+const response = await fetch('https://api.softwart.com/api/cuenta/perfil', {
+  headers: {
+    'Authorization': `Bearer ${token}`
+  }
+});
+```
+
+## Notas
+
+- El token JWT expira en 8 horas
+- Las contraseñas se comparan usando bcrypt
+- El sistema verifica que la cuenta esté activa antes de autenticar
+- Los roles determinan el acceso:
+  - **Cliente**: acceso a landing page y gestión de citas personales
+  - **Admin/Empleado**: acceso al panel administrativo
+- El `id_cliente` es null para usuarios Admin/Empleado que no tienen perfil de cliente asociado

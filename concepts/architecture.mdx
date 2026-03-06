@@ -1,0 +1,305 @@
+---
+title: "Architecture Overview"
+description: "Understanding the high-level architecture of Softwart Backend applications"
+---
+
+# Architecture Overview
+
+Softwart Backend applications follow a **layered MVC architecture** with clear separation of concerns. The framework generates TypeScript applications with Express.js and TypeORM, organized into distinct layers for maintainability and scalability.
+
+## High-Level Architecture
+
+```mermaid
+graph TD
+    A[Client] -->|HTTP Request| B[Express App]
+    B --> C[Middleware Stack]
+    C --> D[Routes Layer]
+    D --> E[Controllers Layer]
+    E --> F[TypeORM Repositories]
+    F --> G[Database]
+    G -->|Results| F
+    F -->|Data| E
+    E -->|Response| D
+    D -->|JSON| C
+    C -->|HTTP Response| A
+```
+
+## Directory Structure
+
+Every generated Softwart Backend project follows this standardized structure:
+
+```
+project-root/
+├── src/
+│   ├── app.ts              # Express app setup and bootstrap
+│   ├── data-source.ts      # TypeORM DataSource configuration
+│   ├── controllers/        # Business logic and request handlers
+│   ├── models/             # TypeORM entity definitions
+│   ├── routes/             # Express route definitions
+│   ├── middlewares/        # Authentication, CORS, rate limiting
+│   ├── errors/             # Custom error classes and handler
+│   ├── seeds/              # Database seeding scripts
+│   └── validators/         # Input validation logic (optional)
+├── dist/                   # Compiled JavaScript output
+├── package.json
+├── tsconfig.json
+└── .env                    # Environment variables
+```
+
+## Application Layers
+
+### 1. Entry Point (`app.ts`)
+
+The application bootstrap process initializes all components in the correct order:
+
+```typescript title="src/app.ts" lines
+import "reflect-metadata";
+import express, { Application } from "express";
+import { AppDataSource } from "./data-source";
+import { runAllSeeds } from "./seeds/index";
+import { registerRoutes } from "./routes";
+import { corsMiddleware, notFoundMiddleware, generalLimiter } from "./middlewares";
+import { errorHandler } from "./errors";
+
+const app: Application = express();
+const PORT = Number(process.env.PORT ?? 3000);
+
+// Middleware setup
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(corsMiddleware);
+
+// Routes
+app.get("/", (_req, res) => {
+  res.json({ success: true, message: "API en línea 🚀", timestamp: new Date() });
+});
+app.use("/api", generalLimiter);
+registerRoutes(app);
+
+// Error handling
+app.use(notFoundMiddleware);
+app.use(errorHandler);
+
+async function bootstrap(): Promise<void> {
+  try {
+    await AppDataSource.initialize();
+    await runAllSeeds();
+    app.listen(PORT, () => {
+      console.log(`🚀  Servidor corriendo en http://localhost:${PORT}`);
+    });
+  } catch (error) {
+    console.error("❌  Error al iniciar la aplicación:", error);
+    process.exit(1);
+  }
+}
+
+bootstrap();
+```
+
+### 2. Data Layer (TypeORM)
+
+The data layer uses TypeORM to interact with PostgreSQL:
+
+- **DataSource** - Centralized database connection configuration
+- **Entities** - TypeScript classes decorated with TypeORM decorators
+- **Repositories** - Type-safe query interfaces for each entity
+- **Relations** - Managed via decorators (`@ManyToOne`, `@OneToMany`, etc.)
+
+### 3. Controller Layer
+
+Controllers handle HTTP requests and contain business logic:
+
+- Validate input parameters
+- Query the database via TypeORM repositories
+- Transform data for API responses
+- Handle errors and return appropriate status codes
+- Implement authorization checks
+
+### 4. Routes Layer
+
+Routes map HTTP methods and paths to controller functions:
+
+- RESTful URL conventions (`/api/usuarios`, `/api/usuarios/:id`)
+- HTTP method mapping (GET, POST, PUT, DELETE, PATCH)
+- Middleware application (authentication, validation)
+- Centralized registration in `routes/index.ts`
+
+### 5. Middleware Layer
+
+Middleware functions process requests before they reach controllers:
+
+**Global Middleware** (applied to all routes):
+- `express.json()` - Parse JSON request bodies
+- `corsMiddleware` - Enable cross-origin requests
+- `errorHandler` - Catch and format errors
+
+**Route-Level Middleware**:
+- `generalLimiter` - Rate limiting for `/api/*`
+- `verifyToken` - JWT authentication
+- `requireRol` - Role-based authorization
+- `requireCliente` - Client-only access control
+
+## Request Flow
+
+Here's how a typical authenticated request flows through the application:
+
+<Steps>
+  <Step title="Client sends request">
+    ```bash
+    curl -X GET https://api.example.com/api/usuarios/123 \
+      -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIs..."
+    ```
+  </Step>
+  
+  <Step title="Middleware processing">
+    1. **CORS middleware** - Add CORS headers
+    2. **Rate limiter** - Check request rate limits
+    3. **verifyToken** - Validate JWT token, attach `req.user`
+    4. **requireRol** - Verify user has "Admin" role
+  </Step>
+  
+  <Step title="Route matching">
+    Express matches the route `/api/usuarios/:id` → `getUsuarioById` controller
+  </Step>
+  
+  <Step title="Controller execution">
+    ```typescript
+    export const getUsuarioById = async (req: Request, res: Response) => {
+      const usuarioRepo = AppDataSource.getRepository(Usuario);
+      const usuario = await usuarioRepo.findOne({
+        where: { id_usuario: Number(req.params.id) },
+        relations: ["rol"],
+      });
+      
+      if (!usuario) {
+        return res.status(404).json({ success: false, message: "Usuario no encontrado" });
+      }
+      
+      res.json({ success: true, data: sinClave(usuario) });
+    };
+    ```
+  </Step>
+  
+  <Step title="Response sent">
+    ```json
+    {
+      "success": true,
+      "data": {
+        "id_usuario": 123,
+        "correo": "user@example.com",
+        "estado": true,
+        "rol": {
+          "id_rol": 1,
+          "nombre": "Admin"
+        }
+      }
+    }
+    ```
+  </Step>
+</Steps>
+
+## Error Handling
+
+The framework includes a centralized error handling system:
+
+```typescript title="src/errors/errorHandler.ts"
+export const errorHandler = (err: Error, req: Request, res: Response, next: NextFunction) => {
+  if (err instanceof AppError) {
+    return res.status(err.statusCode).json({
+      success: false,
+      message: err.message,
+      ...(err.errors && { errors: err.errors }),
+    });
+  }
+  
+  console.error("Unhandled error:", err);
+  res.status(500).json({
+    success: false,
+    message: "Error interno del servidor",
+  });
+};
+```
+
+**Custom Error Classes**:
+- `BadRequestError` (400) - Invalid input
+- `UnauthorizedError` (401) - Missing or invalid credentials
+- `ForbiddenError` (403) - Insufficient permissions
+- `NotFoundError` (404) - Resource not found
+- `ConflictError` (409) - Duplicate resource or constraint violation
+- `ValidationError` (422) - Input validation failure
+
+## Database Connection Management
+
+TypeORM DataSource is initialized once at startup and reused throughout the application:
+
+```typescript title="src/data-source.ts" lines
+export const AppDataSource = new DataSource({
+  type: "postgres",
+  host: process.env.DB_HOST ?? "localhost",
+  port: Number(process.env.DB_PORT ?? 5432),
+  username: process.env.DB_USER ?? "root",
+  password: process.env.DB_PASSWORD ?? "",
+  database: process.env.DB_NAME ?? "mi_base_de_datos",
+  synchronize: true,  // Development only
+  logging: true,
+  entities: [Permiso, Rol, Usuario, Cliente, /* ... */],
+});
+```
+
+<Note>
+The `synchronize: true` option automatically creates/updates database tables in development. Disable this in production and use migrations instead.
+</Note>
+
+## Security Architecture
+
+Security is built into every layer:
+
+**Authentication**:
+- JWT tokens with 8-hour expiration
+- Bcrypt password hashing with salt rounds
+- Token verification middleware
+
+**Authorization**:
+- Role-based access control (Admin, Empleado, Cliente)
+- Permission system with junction table
+- Route-level authorization checks
+
+**Protection**:
+- Rate limiting (general and auth-specific)
+- CORS configuration
+- Request size limits
+- SQL injection prevention via TypeORM parameterized queries
+
+## Scalability Considerations
+
+<CardGroup cols={2}>
+  <Card title="Horizontal Scaling" icon="arrows-left-right">
+    Stateless design allows multiple instances behind a load balancer
+  </Card>
+  <Card title="Database Optimization" icon="database">
+    TypeORM relations can be loaded eagerly or lazily as needed
+  </Card>
+  <Card title="Caching Ready" icon="memory">
+    Repository pattern makes it easy to add Redis caching
+  </Card>
+  <Card title="Microservices" icon="cubes">
+    Each entity group can be split into separate services
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="MVC Structure" icon="layer-group" href="/concepts/mvc-structure">
+    Deep dive into the MVC pattern implementation
+  </Card>
+  <Card title="TypeORM Integration" icon="database" href="/concepts/typeorm-integration">
+    Learn about entities, relations, and repositories
+  </Card>
+  <Card title="Authentication" icon="shield" href="/concepts/authentication">
+    Understand the JWT authentication system
+  </Card>
+  <Card title="Generated Code" icon="code" href="/generated/models">
+    Explore the auto-generated code patterns
+  </Card>
+</CardGroup>

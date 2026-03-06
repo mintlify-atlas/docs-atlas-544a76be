@@ -1,0 +1,341 @@
+---
+title: Security Configuration
+description: Configure JWT authentication, rate limiting, and CORS for the Softwart Backend
+---
+
+## Overview
+
+The Softwart Backend implements multiple security layers including JWT authentication, role-based access control, rate limiting, and CORS protection.
+
+## JWT Authentication
+
+### Configuration
+
+JWT authentication is configured using the `JWT_SECRET` environment variable:
+
+```typescript
+const JWT_SECRET = process.env.JWT_SECRET ?? "dev_secret_cambiame_en_prod";
+```
+
+Reference: `src/middlewares/auth.middleware.ts:4`, `src/controllers/AuthController.ts:10`
+
+<Warning>
+  The default JWT secret should only be used in development. Always set a strong random secret in production.
+</Warning>
+
+### Token Generation
+
+Tokens are generated during login with an 8-hour expiration:
+
+```typescript
+const token = jwt.sign(
+  {
+    id_usuario:  usuario.id_usuario,
+    correo:      usuario.correo,
+    id_rol:      usuario.rol?.id_rol,
+    rol:         usuario.rol?.nombre,
+    id_cliente,
+  },
+  JWT_SECRET,
+  { expiresIn: "8h" },
+);
+```
+
+Reference: `src/controllers/AuthController.ts:133-143`
+
+### Token Payload
+
+JWT tokens contain the following claims:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id_usuario` | `number` | User ID |
+| `correo` | `string` | User email |
+| `id_rol` | `number` | Role ID |
+| `rol` | `string` | Role name ("Admin", "Cliente", etc.) |
+| `id_cliente` | `number \| null` | Client ID (null for admin/employee) |
+
+## Authentication Middleware
+
+### Token Verification
+
+The `verifyToken` middleware validates JWT tokens from the Authorization header:
+
+```typescript
+export const verifyToken: RequestHandler = (req, res, next) => {
+  const authHeader = req.headers["authorization"];
+  const token = authHeader?.split(" ")[1];
+
+  if (!token) {
+    return res.status(401).json({ 
+      success: false, 
+      message: "Token no proporcionado" 
+    });
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as AuthUser;
+    req.user = decoded;
+    next();
+  } catch {
+    return res.status(403).json({ 
+      success: false, 
+      message: "Token inválido o expirado" 
+    });
+  }
+};
+```
+
+Reference: `src/middlewares/auth.middleware.ts:15-30`
+
+### Usage in Routes
+
+Protect routes by applying the middleware:
+
+```typescript
+import { verifyToken } from "./middlewares";
+
+app.get("/api/protected", verifyToken, (req, res) => {
+  // Access user info via req.user
+  res.json({ user: req.user });
+});
+```
+
+## Role-Based Access Control
+
+### Role Guard
+
+Restrict routes to specific roles:
+
+```typescript
+export const requireRol = (...roles: string[]): RequestHandler => {
+  return (req, res, next) => {
+    if (!req.user || !roles.includes(req.user.rol)) {
+      return res.status(403).json({ 
+        success: false, 
+        message: "Acceso denegado: permisos insuficientes" 
+      });
+    }
+    next();
+  };
+};
+```
+
+Reference: `src/middlewares/auth.middleware.ts:33-40`
+
+### Usage Example
+
+```typescript
+import { verifyToken, requireRol } from "./middlewares";
+
+// Only admin users can access
+app.post("/api/admin/users", 
+  verifyToken, 
+  requireRol("Admin"), 
+  createUser
+);
+
+// Admin or Employee can access
+app.get("/api/reports", 
+  verifyToken, 
+  requireRol("Admin", "Empleado"), 
+  getReports
+);
+```
+
+### Client-Specific Guard
+
+Require authenticated client accounts:
+
+```typescript
+export const requireCliente: RequestHandler = (req, res, next) => {
+  if (!req.user || req.user.id_cliente === null) {
+    return res.status(403).json({ 
+      success: false, 
+      message: "Acceso denegado: se requiere cuenta de cliente" 
+    });
+  }
+  next();
+};
+```
+
+Reference: `src/middlewares/auth.middleware.ts:43-48`
+
+## Rate Limiting
+
+### General API Limiter
+
+Applied to all `/api` routes:
+
+```typescript
+export const generalLimiter = rateLimit({
+  windowMs:         15 * 60 * 1000,  // 15 minutes
+  max:              100,              // 100 requests per IP
+  standardHeaders:  true,            // Return RateLimit-* headers
+  legacyHeaders:    false,
+  message: {
+    success: false,
+    message: "Demasiadas solicitudes, intenta de nuevo en 15 minutos",
+  },
+});
+```
+
+Reference: `src/middlewares/rateLimit.middleware.ts:5-14`
+
+### Authentication Limiter
+
+Stricter limits for login and registration endpoints:
+
+```typescript
+export const authLimiter = rateLimit({
+  windowMs:         15 * 60 * 1000,  // 15 minutes
+  max:              10,               // 10 attempts per IP
+  standardHeaders:  true,
+  legacyHeaders:    false,
+  message: {
+    success: false,
+    message: "Demasiados intentos de autenticación, intenta de nuevo en 15 minutos",
+  },
+});
+```
+
+Reference: `src/middlewares/rateLimit.middleware.ts:17-26`
+
+### Applying Rate Limiters
+
+```typescript
+import { generalLimiter, authLimiter } from "./middlewares";
+
+// Apply general limiter to all API routes
+app.use("/api", generalLimiter);
+
+// Apply stricter limiter to auth routes
+app.post("/api/auth/login", authLimiter, login);
+app.post("/api/auth/registro", authLimiter, registro);
+```
+
+Reference: `src/app.ts:23`
+
+## CORS Configuration
+
+### CORS Middleware
+
+CORS is configured via the `CORS_ORIGIN` environment variable:
+
+```typescript
+export const corsMiddleware: RequestHandler = (req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", process.env.CORS_ORIGIN ?? "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization");
+  if (req.method === "OPTIONS") {
+    res.sendStatus(204);
+    return;
+  }
+  next();
+};
+```
+
+Reference: `src/middlewares/cors.middleware.ts:3-12`
+
+### CORS Configuration
+
+| Setting | Value | Description |
+|---------|-------|-------------|
+| **Allowed Origins** | `CORS_ORIGIN` env var | Frontend domain (use `*` only in dev) |
+| **Allowed Methods** | `GET,POST,PUT,PATCH,DELETE,OPTIONS` | HTTP methods |
+| **Allowed Headers** | `Content-Type,Authorization` | Request headers |
+
+### Environment-Specific CORS
+
+**Development:**
+```bash
+CORS_ORIGIN=http://localhost:5173
+```
+
+**Production:**
+```bash
+CORS_ORIGIN=https://yourdomain.com
+```
+
+<Warning>
+  Never use `CORS_ORIGIN=*` in production. Always specify your frontend domain explicitly.
+</Warning>
+
+## Password Security
+
+### Password Hashing
+
+Passwords are hashed using bcrypt with 10 salt rounds:
+
+```typescript
+import bcrypt from "bcrypt";
+
+// Hash password during registration
+const hash = await bcrypt.hash(clave, 10);
+const usuario = usuarioRepo.create({
+  correo,
+  clave: hash,
+  // ...
+});
+```
+
+Reference: `src/controllers/AuthController.ts:63`
+
+### Password Verification
+
+Passwords are verified during login:
+
+```typescript
+const claveValida = await bcrypt.compare(clave, usuario.clave);
+if (!claveValida) {
+  res.status(401).json({ 
+    success: false, 
+    message: "Credenciales inválidas" 
+  });
+  return;
+}
+```
+
+Reference: `src/controllers/AuthController.ts:123-127`
+
+## Security Best Practices
+
+<Tip>
+  - Generate strong JWT secrets (64+ random characters)
+  - Use HTTPS in production to protect tokens in transit
+  - Set appropriate token expiration times (8 hours for user sessions)
+  - Implement refresh tokens for long-lived sessions
+  - Store JWT secrets in environment variables, never in code
+  - Use strict CORS policies in production
+  - Apply rate limiting to prevent brute force attacks
+  - Hash passwords with bcrypt (never store plain text)
+  - Validate user input on all endpoints
+  - Implement proper error handling without leaking sensitive info
+</Tip>
+
+## Related Configuration
+
+- [Environment Variables](/configuration/environment) - Security-related environment variables
+- [Database Configuration](/configuration/database) - Secure database connections
+
+## Authentication Flow
+
+1. **Registration** (`POST /api/auth/registro`)
+   - User submits credentials
+   - Password is hashed with bcrypt
+   - User and Client records created
+   - Rate limited to 10 attempts per 15 minutes
+
+2. **Login** (`POST /api/auth/login`)
+   - User submits credentials
+   - Password verified with bcrypt
+   - JWT token generated and returned
+   - Rate limited to 10 attempts per 15 minutes
+
+3. **Protected Routes**
+   - Client includes JWT in `Authorization: Bearer <token>` header
+   - `verifyToken` middleware validates token
+   - Optional role guards check permissions
+   - Request proceeds if authorized
+
+Reference: `src/controllers/AuthController.ts:17-162`, `src/middlewares/auth.middleware.ts`

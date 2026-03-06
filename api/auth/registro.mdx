@@ -1,0 +1,152 @@
+---
+title: 'Registro'
+api: 'POST /api/auth/registro'
+description: 'Crea una cuenta de cliente con usuario asociado desde la landing page'
+---
+
+Este endpoint permite registrar un nuevo cliente en el sistema. Crea simultáneamente un registro en la tabla Cliente (datos de negocio) y Usuario (seguridad), vinculados por correo electrónico.
+
+## Autenticación
+
+No requiere autenticación (endpoint público).
+
+## Cuerpo de la solicitud
+
+<ParamField body="tipoDocumento" type="string" required>
+  Tipo de documento de identidad (ej: "CC", "TI", "CE")
+</ParamField>
+
+<ParamField body="documento" type="string" required>
+  Número de documento de identidad
+</ParamField>
+
+<ParamField body="nombre" type="string" required>
+  Nombre completo del cliente
+</ParamField>
+
+<ParamField body="correo" type="string" required>
+  Correo electrónico único del cliente
+</ParamField>
+
+<ParamField body="clave" type="string" required>
+  Contraseña para la cuenta (será encriptada con bcrypt)
+</ParamField>
+
+<ParamField body="telefono" type="string" required>
+  Número de teléfono de contacto
+</ParamField>
+
+## Respuesta
+
+<ResponseField name="success" type="boolean">
+  Indica si la operación fue exitosa
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Mensaje descriptivo del resultado
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  Datos del cliente creado
+  
+  <ResponseField name="id_cliente" type="number">
+    ID único del cliente generado
+  </ResponseField>
+  
+  <ResponseField name="nombre" type="string">
+    Nombre del cliente
+  </ResponseField>
+  
+  <ResponseField name="correo" type="string">
+    Correo electrónico del cliente
+  </ResponseField>
+</ResponseField>
+
+## Ejemplo de solicitud
+
+```bash
+curl -X POST https://api.softwart.com/api/auth/registro \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tipoDocumento": "CC",
+    "documento": "1234567890",
+    "nombre": "Juan Pérez",
+    "correo": "juan.perez@example.com",
+    "clave": "MiPassword123!",
+    "telefono": "3001234567"
+  }'
+```
+
+```javascript
+const response = await fetch('https://api.softwart.com/api/auth/registro', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    tipoDocumento: 'CC',
+    documento: '1234567890',
+    nombre: 'Juan Pérez',
+    correo: 'juan.perez@example.com',
+    clave: 'MiPassword123!',
+    telefono: '3001234567'
+  })
+});
+
+const data = await response.json();
+```
+
+## Respuesta exitosa
+
+```json
+{
+  "success": true,
+  "message": "Cuenta creada exitosamente",
+  "data": {
+    "id_cliente": 15,
+    "nombre": "Juan Pérez",
+    "correo": "juan.perez@example.com"
+  }
+}
+```
+
+## Respuestas de error
+
+<ResponseExample>
+```json 400 - Campos requeridos faltantes
+{
+  "success": false,
+  "message": "Campos requeridos: clave, telefono"
+}
+```
+
+```json 409 - Correo duplicado
+{
+  "success": false,
+  "message": "Ya existe una cuenta con ese correo"
+}
+```
+
+```json 500 - Rol no configurado
+{
+  "success": false,
+  "message": "Rol 'Cliente' no configurado en el sistema"
+}
+```
+
+```json 500 - Error del servidor
+{
+  "success": false,
+  "message": "Error al registrar cuenta",
+  "error": {}
+}
+```
+</ResponseExample>
+
+## Notas
+
+- El rol "Cliente" debe existir previamente en la base de datos
+- La contraseña se encripta con bcrypt (10 rondas) antes de almacenarse
+- Se verifica que el correo no exista en las tablas Usuario ni Cliente
+- Todos los campos son requeridos excepto telefono (aunque en la validación actual también es requerido)
+- El cliente y usuario se crean con estado activo (true) por defecto

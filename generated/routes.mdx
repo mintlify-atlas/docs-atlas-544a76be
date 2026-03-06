@@ -1,0 +1,536 @@
+---
+title: Routes
+description: Express route definitions and REST API patterns
+---
+
+## Overview
+
+Routes map HTTP endpoints to controller methods and apply middleware for authentication and authorization. All routes follow RESTful conventions.
+
+## Route Structure
+
+### Basic Pattern
+
+Each entity has its own route file:
+
+```typescript
+import { Router } from "express";
+import { 
+  getAllEntity, 
+  getEntityById, 
+  createEntity,
+  updateEntity, 
+  deleteEntity, 
+  toggleEstadoEntity 
+} from "../controllers/EntityController";
+import { verifyToken, requireRol } from "../middlewares/auth.middleware";
+
+const router = Router();
+
+// Apply middleware
+router.use(verifyToken, requireRol("Admin"));
+
+// Define routes
+router.get("/",             getAllEntity);
+router.get("/:id",          getEntityById);
+router.post("/",            createEntity);
+router.put("/:id",          updateEntity);
+router.delete("/:id",       deleteEntity);
+router.patch("/:id/estado", toggleEstadoEntity);
+
+export { router as entityRouter };
+```
+
+## REST Conventions
+
+### HTTP Methods
+
+| Method | Endpoint | Purpose | Status |
+|--------|----------|---------|--------|
+| GET | `/api/entities` | List all | 200 |
+| GET | `/api/entities/:id` | Get one | 200, 404 |
+| POST | `/api/entities` | Create | 201, 400 |
+| PUT | `/api/entities/:id` | Update | 200, 404 |
+| DELETE | `/api/entities/:id` | Delete | 200, 404, 409 |
+| PATCH | `/api/entities/:id/estado` | Toggle estado | 200, 404 |
+
+## Example Routes
+
+### Usuario Routes
+
+**Location:** `src/routes/UsuarioRoutes.ts`
+
+```typescript
+import { Router } from "express";
+import { 
+  getAllUsuario, 
+  getUsuarioById, 
+  createUsuario,
+  updateUsuario, 
+  deleteUsuario, 
+  toggleEstadoUsuario 
+} from "../controllers/UsuarioController";
+import { verifyToken, requireRol } from "../middlewares/auth.middleware";
+
+const router = Router();
+
+// Todas las rutas de Usuario requieren token de Admin
+router.use(verifyToken, requireRol("Admin"));
+
+router.get("/",             getAllUsuario);
+router.get("/:id",          getUsuarioById);
+router.post("/",            createUsuario);
+router.put("/:id",          updateUsuario);
+router.delete("/:id",       deleteUsuario);
+router.patch("/:id/estado", toggleEstadoUsuario);
+
+export { router as usuarioRouter };
+```
+
+**Key Points:**
+- All routes require authentication (`verifyToken`)
+- Only Admin role can access
+- Uses `router.use()` to apply middleware to all routes
+
+### Cliente Routes
+
+**Location:** `src/routes/ClienteRoutes.ts`
+
+```typescript
+import { Router } from "express";
+import { 
+  getAllCliente, 
+  getClienteById, 
+  createCliente,
+  updateCliente, 
+  deleteCliente, 
+  toggleEstadoCliente 
+} from "../controllers/ClienteController";
+import { verifyToken, requireRol } from "../middlewares/auth.middleware";
+
+const router = Router();
+
+// Admin y Empleado pueden gestionar clientes
+router.use(verifyToken, requireRol("Admin", "Empleado"));
+
+router.get("/",             getAllCliente);
+router.get("/:id",          getClienteById);
+router.post("/",            createCliente);
+router.put("/:id",          updateCliente);
+router.delete("/:id",       deleteCliente);
+router.patch("/:id/estado", toggleEstadoCliente);
+
+export { router as clienteRouter };
+```
+
+**Key Points:**
+- Multiple roles allowed: "Admin" and "Empleado"
+- Same CRUD pattern as other routes
+
+## Route Registration
+
+### Central Router
+
+**Location:** `src/routes/index.ts`
+
+All routes are registered in a central file:
+
+```typescript
+import { Application } from "express";
+import { permisoRouter } from "./PermisoRoutes";
+import { rolRouter } from "./RolRoutes";
+import { permisoRolRouter } from "./PermisoRolRoutes";
+import { usuarioRouter } from "./UsuarioRoutes";
+import { clienteRouter } from "./ClienteRoutes";
+import { servicioRouter } from "./ServicioRoutes";
+import { estadoCitaRouter } from "./EstadoCitaRoutes";
+import { estadoServicioRouter } from "./EstadoServicioRoutes";
+import { metodoPagoRouter } from "./MetodoPagoRoutes";
+import { estadoPagoRouter } from "./EstadoPagoRoutes";
+import { citaRouter } from "./CitaRoutes";
+import { marcoRouter } from "./MarcoRoutes";
+import { ventaRouter } from "./VentaRoutes";
+import { detalleVentaRouter } from "./DetalleVentaRoutes";
+import { pagoRouter } from "./PagoRoutes";
+import { authRouter } from "./AuthRoutes";
+import { cuentaClienteRouter } from "./CuentaClienteRoutes";
+
+export function registerRoutes(app: Application): void {
+  app.use("/api/permisos", permisoRouter);
+  app.use("/api/roles", rolRouter);
+  app.use("/api/permiso-rol", permisoRolRouter);
+  app.use("/api/usuarios", usuarioRouter);
+  app.use("/api/clientes", clienteRouter);
+  app.use("/api/servicios", servicioRouter);
+  app.use("/api/estado-cita", estadoCitaRouter);
+  app.use("/api/estado-servicio", estadoServicioRouter);
+  app.use("/api/metodo-pago", metodoPagoRouter);
+  app.use("/api/estado-pago", estadoPagoRouter);
+  app.use("/api/citas", citaRouter);
+  app.use("/api/marcos", marcoRouter);
+  app.use("/api/ventas", ventaRouter);
+  app.use("/api/detalle-venta", detalleVentaRouter);
+  app.use("/api/pagos", pagoRouter);
+  app.use("/api/auth", authRouter);
+  app.use("/api/cuenta", cuentaClienteRouter);
+}
+```
+
+**Usage in `app.ts`:**
+
+```typescript
+import express from "express";
+import { registerRoutes } from "./routes";
+
+const app = express();
+
+// ... middleware setup ...
+
+registerRoutes(app);
+
+app.listen(3000);
+```
+
+## URL Patterns
+
+### Base Paths
+
+All API routes are prefixed with `/api`:
+
+```
+/api/usuarios
+/api/clientes
+/api/citas
+/api/ventas
+/api/servicios
+```
+
+### Naming Conventions
+
+- **Plural nouns:** `/api/clientes` (not `/api/cliente`)
+- **Kebab-case for multi-word:** `/api/estado-cita`, `/api/detalle-venta`
+- **Consistent with database tables:** `cliente` → `/api/clientes`
+
+### Parameter Routes
+
+```typescript
+router.get("/:id", getEntityById);
+// Matches: /api/clientes/123
+// Access: req.params.id
+
+router.patch("/:id/estado", toggleEstadoEntity);
+// Matches: /api/clientes/123/estado
+// Access: req.params.id
+```
+
+## Middleware Application
+
+### Route-Level Middleware
+
+Apply to all routes in a router:
+
+```typescript
+const router = Router();
+
+// All routes require authentication and Admin role
+router.use(verifyToken, requireRol("Admin"));
+
+router.get("/", getAllEntity);
+router.post("/", createEntity);
+// Both routes protected
+```
+
+### Per-Route Middleware
+
+Apply to specific routes:
+
+```typescript
+const router = Router();
+
+// Public route
+router.get("/", getAllEntity);
+
+// Protected routes
+router.post("/", verifyToken, requireRol("Admin"), createEntity);
+router.put("/:id", verifyToken, requireRol("Admin"), updateEntity);
+```
+
+### Multiple Middlewares
+
+Middleware executes in order:
+
+```typescript
+router.use(
+  verifyToken,           // 1. Verify JWT
+  requireRol("Admin"),   // 2. Check role
+  requirePermiso("write") // 3. Check permission
+);
+```
+
+## Authentication Patterns
+
+### Admin Only
+
+```typescript
+router.use(verifyToken, requireRol("Admin"));
+```
+
+Used for:
+- Usuario management
+- Rol management
+- Permiso management
+
+### Admin + Empleado
+
+```typescript
+router.use(verifyToken, requireRol("Admin", "Empleado"));
+```
+
+Used for:
+- Cliente management
+- Cita management
+- Venta management
+- Servicio management
+
+### Cliente Access
+
+```typescript
+router.use(verifyToken, requireCliente);
+```
+
+Used for:
+- Cliente account (/api/cuenta)
+- Personal data access
+
+### Public Routes
+
+No middleware applied:
+
+```typescript
+router.post("/login", login);
+router.post("/register", register);
+```
+
+Used for:
+- Authentication endpoints
+- Public information
+
+## Special Routes
+
+### Authentication Routes
+
+```typescript
+import { Router } from "express";
+import { login, register } from "../controllers/AuthController";
+import { authLimiter } from "../middlewares/rateLimit.middleware";
+
+const router = Router();
+
+// Apply rate limiting to prevent brute force
+router.post("/login", authLimiter, login);
+router.post("/register", authLimiter, register);
+
+export { router as authRouter };
+```
+
+### Account Routes
+
+```typescript
+import { Router } from "express";
+import { getMiCuenta, updateMiCuenta } from "../controllers/CuentaClienteController";
+import { verifyToken, requireCliente } from "../middlewares/auth.middleware";
+
+const router = Router();
+
+// Only authenticated clients can access their account
+router.use(verifyToken, requireCliente);
+
+router.get("/", getMiCuenta);
+router.put("/", updateMiCuenta);
+
+export { router as cuentaClienteRouter };
+```
+
+## Request/Response Examples
+
+### List All
+
+**Request:**
+```http
+GET /api/clientes
+Authorization: Bearer <token>
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id_cliente": 1,
+      "nombre": "Juan Pérez",
+      "correo": "juan@example.com",
+      "estado": true
+    }
+  ]
+}
+```
+
+### Get By ID
+
+**Request:**
+```http
+GET /api/clientes/1
+Authorization: Bearer <token>
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "id_cliente": 1,
+    "tipoDocumento": "DNI",
+    "documento": "12345678",
+    "nombre": "Juan Pérez",
+    "correo": "juan@example.com",
+    "telefono": "987654321",
+    "estado": true
+  }
+}
+```
+
+### Create
+
+**Request:**
+```http
+POST /api/clientes
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "tipoDocumento": "DNI",
+  "documento": "12345678",
+  "nombre": "Juan Pérez",
+  "correo": "juan@example.com",
+  "telefono": "987654321"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Cliente creado exitosamente",
+  "data": {
+    "id_cliente": 1,
+    "tipoDocumento": "DNI",
+    "documento": "12345678",
+    "nombre": "Juan Pérez",
+    "correo": "juan@example.com",
+    "telefono": "987654321",
+    "estado": true
+  }
+}
+```
+
+### Update
+
+**Request:**
+```http
+PUT /api/clientes/1
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "telefono": "999888777"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Cliente actualizado",
+  "data": {
+    "id_cliente": 1,
+    "tipoDocumento": "DNI",
+    "documento": "12345678",
+    "nombre": "Juan Pérez",
+    "correo": "juan@example.com",
+    "telefono": "999888777",
+    "estado": true
+  }
+}
+```
+
+### Toggle Estado
+
+**Request:**
+```http
+PATCH /api/clientes/1/estado
+Authorization: Bearer <token>
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Cliente inactivado",
+  "data": {
+    "estado": false
+  }
+}
+```
+
+### Delete
+
+**Request:**
+```http
+DELETE /api/clientes/1
+Authorization: Bearer <token>
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Cliente eliminado correctamente"
+}
+```
+
+## Generation Process
+
+Routes are generated using:
+
+```bash
+node scripts/generate-routes.js
+```
+
+The generator creates:
+- Individual route files for each entity
+- Central registration in `routes/index.ts`
+- Standard CRUD endpoints
+- Proper middleware application
+
+<Note>
+Generated route files include the comment:
+`// Generado automáticamente por generate-routes.js`
+</Note>
+
+## Best Practices
+
+1. **Use RESTful conventions** for endpoint naming
+2. **Apply authentication** at router level when possible
+3. **Use specific roles** for authorization
+4. **Apply rate limiting** to sensitive endpoints
+5. **Keep routes thin** - business logic goes in controllers
+6. **Export named routers** for clarity
+7. **Centralize route registration** in `routes/index.ts`
+8. **Use plural nouns** for resource names
+
+## Related Documentation
+
+- [Controllers](/generated/controllers) - Route handler implementations
+- [Middlewares](/generated/middlewares) - Authentication and authorization
+- [Models](/generated/models) - Data structures

@@ -1,0 +1,469 @@
+---
+title: 'generate-routes'
+description: 'Generate Express routes with automatic controller mapping'
+icon: 'route'
+---
+
+## Overview
+
+The `generate-routes` command creates Express.js route files that map HTTP endpoints to controller functions, including standard CRUD operations and custom endpoints.
+
+## Command Syntax
+
+```bash
+node generate-routes.js
+```
+
+This command:
+- Generates route files in `./routes/`
+- Maps controllers to Express routes
+- Handles standard and junction table patterns
+- Creates a centralized `routes/index.ts` with all route registrations
+- Defines API prefixes for each entity
+
+## Route Schema Format
+
+Define routes in the script:
+
+```javascript
+const routeSchema = [
+  {
+    name: "Usuario",
+    file: "UsuarioRoutes",
+    controller: "UsuarioController",
+    pkParam: "id",
+    hasEstado: true,
+    exports: [
+      "getAllUsuario",
+      "getUsuarioById",
+      "createUsuario",
+      "updateUsuario",
+      "deleteUsuario",
+      "toggleEstadoUsuario"
+    ],
+  },
+];
+```
+
+## Schema Properties
+
+<ParamField path="name" type="string" required>
+  Entity name (used for router variable naming)
+</ParamField>
+
+<ParamField path="file" type="string" required>
+  Route filename without extension (e.g., "UsuarioRoutes")
+</ParamField>
+
+<ParamField path="controller" type="string" required>
+  Controller filename to import from
+</ParamField>
+
+<ParamField path="pkParam" type="string" required>
+  URL parameter name for the primary key (e.g., "id", "id_usuario")
+</ParamField>
+
+<ParamField path="hasEstado" type="boolean" default="false">
+  Generates PATCH /:id/estado route
+</ParamField>
+
+<ParamField path="isJunction" type="boolean" default="false">
+  Use junction table routing pattern (no GET /:id or PUT)
+</ParamField>
+
+<ParamField path="exports" type="array" required>
+  List of controller function names to import
+</ParamField>
+
+<ParamField path="extraRoutes" type="array">
+  Additional custom routes beyond standard CRUD
+</ParamField>
+
+## Extra Routes Format
+
+```javascript
+extraRoutes: [
+  {
+    method: "patch",
+    routePath: "/cita/:id_cita/estado",
+    handler: "cambiarEstadoCita",
+    comment: "Cambia el estado de una Cita",
+  },
+]
+```
+
+<ParamField path="method" type="string" required>
+  HTTP method: `get`, `post`, `put`, `patch`, `delete`
+</ParamField>
+
+<ParamField path="routePath" type="string" required>
+  Route path (relative to the entity base path)
+</ParamField>
+
+<ParamField path="handler" type="string" required>
+  Controller function name to handle this route
+</ParamField>
+
+<ParamField path="comment" type="string">
+  Description comment for the route
+</ParamField>
+
+## Generated Route Files
+
+### Standard Entity Routes
+
+```typescript UsuarioRoutes.ts
+// Generado automáticamente por generate-routes.js
+import { Router } from "express";
+import {
+  getAllUsuario,
+  getUsuarioById,
+  createUsuario,
+  updateUsuario,
+  deleteUsuario,
+  toggleEstadoUsuario
+} from "../controllers/UsuarioController";
+
+const router = Router();
+
+// ── Rutas de Usuario ────────────────────────────────────
+// GET    /           → listar todos
+router.get("/", getAllUsuario);
+
+// GET    /:id        → obtener uno por ID
+router.get("/:id", getUsuarioById);
+
+// POST   /           → crear nuevo
+router.post("/", createUsuario);
+
+// PUT    /:id        → actualizar
+router.put("/:id", updateUsuario);
+
+// DELETE /:id        → eliminar (valida dependencias)
+router.delete("/:id", deleteUsuario);
+
+// PATCH  /:id/estado → activar / inactivar
+router.patch("/:id/estado", toggleEstadoUsuario);
+
+export { router as usuarioRouter };
+```
+
+### Junction Table Routes
+
+For many-to-many relationships:
+
+```typescript PermisoRolRoutes.ts
+// Generado automáticamente por generate-routes.js
+import { Router } from "express";
+import {
+  getAllPermisoRol,
+  createPermisoRol,
+  deletePermisoRol
+} from "../controllers/PermisoRolController";
+
+const router = Router();
+
+// ── Rutas de PermisoRol ─────────────────────────────────
+// GET    /           → listar todas las relaciones
+router.get("/", getAllPermisoRol);
+
+// POST   /           → crear relación  { id_permiso, id_rol }
+router.post("/", createPermisoRol);
+
+// DELETE /           → eliminar relación  { id_permiso, id_rol }
+router.delete("/", deletePermisoRol);
+
+export { router as permisoRolRouter };
+```
+
+### Routes with Extra Endpoints
+
+```typescript EstadoCitaRoutes.ts
+// Generado automáticamente por generate-routes.js
+import { Router } from "express";
+import {
+  getAllEstadoCita,
+  getEstadoCitaById,
+  createEstadoCita,
+  updateEstadoCita,
+  deleteEstadoCita,
+  cambiarEstadoCita
+} from "../controllers/EstadoCitaController";
+
+const router = Router();
+
+// ── Rutas de EstadoCita ─────────────────────────────────
+// GET    /           → listar todos
+router.get("/", getAllEstadoCita);
+
+// GET    /:id        → obtener uno por ID
+router.get("/:id", getEstadoCitaById);
+
+// POST   /           → crear nuevo
+router.post("/", createEstadoCita);
+
+// PUT    /:id        → actualizar
+router.put("/:id", updateEstadoCita);
+
+// DELETE /:id        → eliminar (valida dependencias)
+router.delete("/:id", deleteEstadoCita);
+
+// PATCH  /cita/:id_cita/estado        → Cambia el estado de una Cita
+router.patch("/cita/:id_cita/estado", cambiarEstadoCita);
+
+export { router as estadoCitaRouter };
+```
+
+## Routes Index
+
+The generator creates `routes/index.ts` to register all routes:
+
+```typescript index.ts
+// Generado automáticamente por generate-routes.js
+import { Application } from "express";
+import { permisoRouter } from "./PermisoRoutes";
+import { rolRouter } from "./RolRoutes";
+import { permisoRolRouter } from "./PermisoRolRoutes";
+import { usuarioRouter } from "./UsuarioRoutes";
+import { clienteRouter } from "./ClienteRoutes";
+import { servicioRouter } from "./ServicioRoutes";
+import { estadoCitaRouter } from "./EstadoCitaRoutes";
+import { citaRouter } from "./CitaRoutes";
+import { ventaRouter } from "./VentaRoutes";
+import { pagoRouter } from "./PagoRoutes";
+
+/**
+ * Registra todas las rutas de la API en la aplicación Express.
+ *
+ * Endpoints disponibles:
+ * //   GET     /api/permisos
+ * //   GET     /api/permisos/:id
+ * //   POST    /api/permisos
+ * //   PUT     /api/permisos/:id
+ * //   DELETE  /api/permisos/:id
+ * //   PATCH   /api/permisos/:id/estado
+ * //   GET     /api/roles
+ * //   GET     /api/roles/:id
+ * //   POST    /api/roles
+ * //   PUT     /api/roles/:id
+ * //   DELETE  /api/roles/:id
+ * //   PATCH   /api/roles/:id/estado
+ * //   GET     /api/usuarios
+ * //   GET     /api/usuarios/:id
+ * //   POST    /api/usuarios
+ * //   PUT     /api/usuarios/:id
+ * //   DELETE  /api/usuarios/:id
+ * //   PATCH   /api/usuarios/:id/estado
+ * ... (more routes)
+ */
+export function registerRoutes(app: Application): void {
+  app.use("/api/permisos", permisoRouter);
+  app.use("/api/roles", rolRouter);
+  app.use("/api/permiso-rol", permisoRolRouter);
+  app.use("/api/usuarios", usuarioRouter);
+  app.use("/api/clientes", clienteRouter);
+  app.use("/api/servicios", servicioRouter);
+  app.use("/api/estado-cita", estadoCitaRouter);
+  app.use("/api/citas", citaRouter);
+  app.use("/api/ventas", ventaRouter);
+  app.use("/api/pagos", pagoRouter);
+}
+```
+
+## API Prefixes
+
+The generator uses predefined API prefixes:
+
+| Entity | API Prefix |
+|--------|------------|
+| Permiso | `/api/permisos` |
+| Rol | `/api/roles` |
+| PermisoRol | `/api/permiso-rol` |
+| Usuario | `/api/usuarios` |
+| Cliente | `/api/clientes` |
+| Servicio | `/api/servicios` |
+| EstadoCita | `/api/estado-cita` |
+| EstadoServicio | `/api/estado-servicio` |
+| MetodoPago | `/api/metodo-pago` |
+| EstadoPago | `/api/estado-pago` |
+| Cita | `/api/citas` |
+| Marco | `/api/marcos` |
+| Venta | `/api/ventas` |
+| DetalleVenta | `/api/detalle-venta` |
+| Pago | `/api/pagos` |
+
+## Output
+
+```bash
+════════════════════════════════════════════════════════
+  🚀  generate-routes.js
+════════════════════════════════════════════════════════
+
+────────────────────────────────────────────────────────
+  🛣   ARCHIVOS DE RUTAS
+────────────────────────────────────────────────────────
+  ✅  routes/PermisoRoutes.ts
+  ✅  routes/RolRoutes.ts
+  ✅  routes/PermisoRolRoutes.ts
+  ✅  routes/UsuarioRoutes.ts
+  ✅  routes/ClienteRoutes.ts
+  ✅  routes/ServicioRoutes.ts
+  ✅  routes/EstadoCitaRoutes.ts
+  ✅  routes/CitaRoutes.ts
+  ✅  routes/VentaRoutes.ts
+  ✅  routes/PagoRoutes.ts
+
+────────────────────────────────────────────────────────
+  📋  ÍNDICE DE RUTAS
+────────────────────────────────────────────────────────
+  ✅  routes/index.ts
+
+════════════════════════════════════════════════════════
+  🎉  11 archivos generados, 0 errores
+
+  💡  En tu app.ts agrega:
+      import { registerRoutes } from "./routes";
+      registerRoutes(app);
+════════════════════════════════════════════════════════
+```
+
+## Integration
+
+In your `app.ts`:
+
+```typescript app.ts
+import express from "express";
+import { registerRoutes } from "./routes";
+
+const app = express();
+
+// Middlewares
+app.use(express.json());
+
+// Register all routes
+registerRoutes(app);
+
+export default app;
+```
+
+## Usage Examples
+
+<Steps>
+  <Step title="Generate routes">
+    ```bash
+    node generate-routes.js
+    ```
+  </Step>
+
+  <Step title="Import in your app">
+    ```typescript
+    import { registerRoutes } from "./routes";
+    registerRoutes(app);
+    ```
+  </Step>
+
+  <Step title="Start the server">
+    ```bash
+    npm run dev
+    ```
+  </Step>
+
+  <Step title="Test endpoints">
+    ```bash
+    # List all users
+    curl http://localhost:3000/api/usuarios
+    
+    # Get user by ID
+    curl http://localhost:3000/api/usuarios/1
+    
+    # Create user
+    curl -X POST http://localhost:3000/api/usuarios \
+      -H "Content-Type: application/json" \
+      -d '{"correo":"user@example.com","clave":"pass123","id_rol":1}'
+    
+    # Toggle user status
+    curl -X PATCH http://localhost:3000/api/usuarios/1/estado
+    ```
+  </Step>
+</Steps>
+
+## Standard Route Patterns
+
+### Entity CRUD Routes
+
+<CodeGroup>
+```typescript GET All
+GET /api/usuarios
+Response: { success: true, data: [...] }
+```
+
+```typescript GET One
+GET /api/usuarios/:id
+Response: { success: true, data: {...} }
+```
+
+```typescript POST Create
+POST /api/usuarios
+Body: { correo, clave, id_rol }
+Response: { success: true, message: "...", data: {...} }
+```
+
+```typescript PUT Update
+PUT /api/usuarios/:id
+Body: { correo?, clave?, id_rol? }
+Response: { success: true, message: "...", data: {...} }
+```
+
+```typescript DELETE Delete
+DELETE /api/usuarios/:id
+Response: { success: true, message: "..." }
+```
+
+```typescript PATCH Toggle Estado
+PATCH /api/usuarios/:id/estado
+Response: { success: true, message: "Usuario activado", data: { estado: true } }
+```
+</CodeGroup>
+
+### Junction Table Routes
+
+<CodeGroup>
+```typescript GET Relations
+GET /api/permiso-rol
+Response: { success: true, data: [...] }
+```
+
+```typescript POST Create Relation
+POST /api/permiso-rol
+Body: { id_permiso: 1, id_rol: 2 }
+Response: { success: true, message: "...", data: {...} }
+```
+
+```typescript DELETE Delete Relation
+DELETE /api/permiso-rol
+Body: { id_permiso: 1, id_rol: 2 }
+Response: { success: true, message: "..." }
+```
+</CodeGroup>
+
+## Custom Endpoints
+
+For catalog assignment endpoints:
+
+```typescript
+// Change appointment status
+PATCH /api/estado-cita/cita/:id_cita/estado
+Body: { id_estado_cita: 2 }
+
+// Assign payment method
+PATCH /api/metodo-pago/pago/:id_pago/metodo
+Body: { id_metodo_pago: 1 }
+
+// Change payment status
+PATCH /api/estado-pago/pago/:id_pago/estado
+Body: { id_estado_pago: 2 }
+```
+
+<Note>
+All routes automatically include error handling and return consistent JSON responses with `success` and `message` fields.
+</Note>

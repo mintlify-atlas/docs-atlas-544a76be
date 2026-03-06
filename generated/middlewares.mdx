@@ -1,0 +1,577 @@
+---
+title: Middlewares
+description: Authentication, authorization, CORS, and rate limiting middleware
+---
+
+## Overview
+
+Middleware functions process requests before they reach controllers. The system uses middleware for authentication, authorization, CORS, rate limiting, and error handling.
+
+## Middleware Stack
+
+Middleware executes in this order:
+
+```typescript
+import express from "express";
+import { 
+  corsMiddleware, 
+  generalLimiter, 
+  verifyToken, 
+  requireRol 
+} from "./middlewares";
+
+const app = express();
+
+app.use(corsMiddleware);      // 1. CORS headers
+app.use(express.json());      // 2. Parse JSON
+app.use(generalLimiter);      // 3. Rate limiting
+// Routes with auth middleware
+// Error handler (last)
+```
+
+## Authentication Middleware
+
+### verifyToken
+
+**Location:** `src/middlewares/auth.middleware.ts:15`
+
+```typescript
+import { RequestHandler } from "express";
+import jwt from "jsonwebtoken";
+
+const JWT_SECRET = process.env.JWT_SECRET ?? "dev_secret_cambiame_en_prod";
+
+export interface AuthUser {
+  id_usuario: number;
+  correo: string;
+  id_rol: number;
+  rol: string;              // "Admin", "Cliente"
+  id_cliente: number | null;
+}
+
+export const verifyToken: RequestHandler = (req, res, next) => {
+  const authHeader = req.headers["authorization"];
+  const token = authHeader?.split(" ")[1];
+
+  if (!token) {
+    return res.status(401).json({ 
+      success: false, 
+      message: "Token no proporcionado" 
+    });
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as AuthUser;
+    req.user = decoded;
+    next();
+  } catch {
+    return res.status(403).json({ 
+      success: false, 
+      message: "Token inválido o expirado" 
+    });
+  }
+};
+```
+
+**Purpose:**
+- Validates JWT token from Authorization header
+- Decodes user information
+- Attaches `req.user` for downstream middleware
+- Returns 401 if no token
+- Returns 403 if invalid/expired token
+
+**Usage:**
+```typescript
+import { verifyToken } from "../middlewares/auth.middleware";
+
+router.use(verifyToken);
+router.get("/", getAllEntity);
+```
+
+**Token Format:**
+```http
+Authorization: Bearer <jwt_token>
+```
+
+## Authorization Middleware
+
+### requireRol
+
+**Location:** `src/middlewares/auth.middleware.ts:33`
+
+```typescript
+export const requireRol = (...roles: string[]): RequestHandler => {
+  return (req, res, next) => {
+    if (!req.user || !roles.includes(req.user.rol)) {
+      return res.status(403).json({ 
+        success: false, 
+        message: "Acceso denegado: permisos insuficientes" 
+      });
+    }
+    next();
+  };
+};
+```
+
+**Purpose:**
+- Checks if user has required role
+- Accepts multiple roles (OR logic)
+- Returns 403 if user lacks permission
+
+**Usage:**
+```typescript
+import { verifyToken, requireRol } from "../middlewares/auth.middleware";
+
+// Single role
+router.use(verifyToken, requireRol("Admin"));
+
+// Multiple roles
+router.use(verifyToken, requireRol("Admin", "Empleado"));
+```
+
+**Example Flow:**
+```
+Request → verifyToken → requireRol("Admin") → Controller
+          ↓              ↓
+          Sets req.user  Checks req.user.rol
+```
+
+### requireCliente
+
+**Location:** `src/middlewares/auth.middleware.ts:43`
+
+```typescript
+export const requireCliente: RequestHandler = (req, res, next) => {
+  if (!req.user || req.user.id_cliente === null) {
+    return res.status(403).json({ 
+      success: false, 
+      message: "Acceso denegado: se requiere cuenta de cliente" 
+    });
+  }
+  next();
+};
+```
+
+**Purpose:**
+- Ensures user has associated Cliente record
+- Used for client-specific endpoints
+- Checks `id_cliente` is not null
+
+**Usage:**
+```typescript
+import { verifyToken, requireCliente } from "../middlewares/auth.middleware";
+
+// Only authenticated clients
+router.use(verifyToken, requireCliente);
+router.get("/cuenta", getMiCuenta);
+```
+
+## CORS Middleware
+
+**Location:** `src/middlewares/cors.middleware.ts`
+
+```typescript
+import { RequestHandler } from "express";
+
+export const corsMiddleware: RequestHandler = (req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", process.env.CORS_ORIGIN ?? "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization");
+  if (req.method === "OPTIONS") {
+    res.sendStatus(204);
+    return;
+  }
+  next();
+};
+```
+
+**Purpose:**
+- Enables Cross-Origin Resource Sharing
+- Configures allowed origins, methods, and headers
+- Handles preflight OPTIONS requests
+
+**Configuration:**
+```bash
+# .env
+CORS_ORIGIN=http://localhost:3000
+```
+
+**Default:** Allows all origins (`*`) if not configured
+
+**Headers Set:**
+- `Access-Control-Allow-Origin`: Allowed origins
+- `Access-Control-Allow-Methods`: HTTP methods
+- `Access-Control-Allow-Headers`: Request headers
+
+**Preflight Handling:**
+Browser sends OPTIONS request before actual request:
+```
+OPTIONS /api/clientes
+↓
+CORS middleware responds with 204
+↓
+Browser sends actual request
+POST /api/clientes
+```
+
+## Rate Limiting Middleware
+
+**Location:** `src/middlewares/rateLimit.middleware.ts`
+
+### generalLimiter
+
+```typescript
+import rateLimit from "express-rate-limit";
+
+export const generalLimiter = rateLimit({
+  windowMs:         15 * 60 * 1000,  // ventana de 15 minutos
+  max:              100,              // máx 100 requests por IP
+  standardHeaders:  true,            // devuelve info en headers RateLimit-*
+  legacyHeaders:    false,
+  message: {
+    success: false,
+    message: "Demasiadas solicitudes, intenta de nuevo en 15 minutos",
+  },
+});
+```
+
+**Purpose:**
+- Prevents API abuse
+- Limits requests per IP address
+- Returns 429 when limit exceeded
+
+**Configuration:**
+- **Window:** 15 minutes
+- **Max Requests:** 100 per window
+- **Per:** IP address
+
+**Response Headers:**
+```http
+RateLimit-Limit: 100
+RateLimit-Remaining: 95
+RateLimit-Reset: 1678901234
+```
+
+**Usage:**
+```typescript
+import { generalLimiter } from "../middlewares/rateLimit.middleware";
+
+app.use(generalLimiter);
+```
+
+### authLimiter
+
+```typescript
+export const authLimiter = rateLimit({
+  windowMs:         15 * 60 * 1000,  // ventana de 15 minutos
+  max:              10,              // máx 10 intentos de login por IP
+  standardHeaders:  true,
+  legacyHeaders:    false,
+  message: {
+    success: false,
+    message: "Demasiados intentos de autenticación, intenta de nuevo en 15 minutos",
+  },
+});
+```
+
+**Purpose:**
+- Prevents brute force attacks
+- Stricter limit for auth endpoints
+- Protects login/register routes
+
+**Configuration:**
+- **Window:** 15 minutes
+- **Max Requests:** 10 per window
+- **Per:** IP address
+
+**Usage:**
+```typescript
+import { authLimiter } from "../middlewares/rateLimit.middleware";
+
+router.post("/login", authLimiter, login);
+router.post("/register", authLimiter, register);
+```
+
+## Middleware Exports
+
+**Location:** `src/middlewares/index.ts`
+
+Central export point for all middleware:
+
+```typescript
+export { corsMiddleware }      from "./cors.middleware";
+export { notFoundMiddleware }  from "./notFound.middleware";
+export { generalLimiter, authLimiter } from "./rateLimit.middleware";
+export { verifyToken, requireRol, requireCliente } from "./auth.middleware";
+export { requirePermiso }      from "./requirePermiso.middleware";
+
+export type { AuthUser }       from "./auth.middleware";
+```
+
+**Usage:**
+```typescript
+import { 
+  corsMiddleware, 
+  verifyToken, 
+  requireRol 
+} from "./middlewares";
+```
+
+## Middleware Patterns
+
+### Global Middleware
+
+Applied to all requests:
+
+```typescript
+import express from "express";
+import { corsMiddleware, generalLimiter } from "./middlewares";
+
+const app = express();
+
+app.use(corsMiddleware);
+app.use(express.json());
+app.use(generalLimiter);
+```
+
+### Router-Level Middleware
+
+Applied to all routes in a router:
+
+```typescript
+import { Router } from "express";
+import { verifyToken, requireRol } from "../middlewares/auth.middleware";
+
+const router = Router();
+
+router.use(verifyToken, requireRol("Admin"));
+
+router.get("/", getAllEntity);     // Protected
+router.post("/", createEntity);    // Protected
+```
+
+### Route-Specific Middleware
+
+Applied to individual routes:
+
+```typescript
+import { Router } from "express";
+import { verifyToken, requireRol } from "../middlewares/auth.middleware";
+import { authLimiter } from "../middlewares/rateLimit.middleware";
+
+const router = Router();
+
+router.post("/login", authLimiter, login);  // Rate limited
+router.get("/public", getPublic);           // No protection
+router.get("/admin", verifyToken, requireRol("Admin"), getAdmin);
+```
+
+### Middleware Chaining
+
+Order matters:
+
+```typescript
+router.post(
+  "/",
+  authLimiter,              // 1. Check rate limit
+  verifyToken,              // 2. Verify JWT
+  requireRol("Admin"),      // 3. Check role
+  createEntity              // 4. Controller
+);
+```
+
+If any middleware returns, the chain stops:
+```
+Request → authLimiter → verifyToken → requireRol → Controller
+                        ↓ (invalid)  
+                        403 Response
+                        (Chain stops)
+```
+
+## Request Object Extensions
+
+### AuthUser Type
+
+```typescript
+export interface AuthUser {
+  id_usuario: number;
+  correo: string;
+  id_rol: number;
+  rol: string;              // "Admin", "Empleado", "Cliente"
+  id_cliente: number | null;
+}
+
+declare global {
+  namespace Express {
+    interface Request {
+      user?: AuthUser;
+    }
+  }
+}
+```
+
+**Usage in Controllers:**
+```typescript
+export const getProfile = async (req: Request, res: Response): Promise<void> => {
+  const userId = req.user!.id_usuario;
+  const userRole = req.user!.rol;
+  const clientId = req.user?.id_cliente;
+  
+  // Use user data...
+};
+```
+
+## Error Responses
+
+### Authentication Errors
+
+**No Token (401):**
+```json
+{
+  "success": false,
+  "message": "Token no proporcionado"
+}
+```
+
+**Invalid Token (403):**
+```json
+{
+  "success": false,
+  "message": "Token inválido o expirado"
+}
+```
+
+### Authorization Errors
+
+**Insufficient Role (403):**
+```json
+{
+  "success": false,
+  "message": "Acceso denegado: permisos insuficientes"
+}
+```
+
+**Not a Cliente (403):**
+```json
+{
+  "success": false,
+  "message": "Acceso denegado: se requiere cuenta de cliente"
+}
+```
+
+### Rate Limit Errors
+
+**Too Many Requests (429):**
+```json
+{
+  "success": false,
+  "message": "Demasiadas solicitudes, intenta de nuevo en 15 minutos"
+}
+```
+
+**Auth Limit (429):**
+```json
+{
+  "success": false,
+  "message": "Demasiados intentos de autenticación, intenta de nuevo en 15 minutos"
+}
+```
+
+## Security Best Practices
+
+### JWT Configuration
+
+```typescript
+const JWT_SECRET = process.env.JWT_SECRET ?? "dev_secret_cambiame_en_prod";
+```
+
+**Production:**
+```bash
+# .env
+JWT_SECRET=your-secure-random-secret-here
+```
+
+<Warning>
+Never use the default secret in production. Generate a strong random secret:
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+</Warning>
+
+### CORS Configuration
+
+**Development:**
+```bash
+CORS_ORIGIN=*
+```
+
+**Production:**
+```bash
+CORS_ORIGIN=https://yourdomain.com
+```
+
+### Rate Limiting
+
+**Adjust limits based on usage:**
+```typescript
+export const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: process.env.NODE_ENV === 'production' ? 100 : 1000,
+});
+```
+
+## Common Use Cases
+
+### Public Endpoint
+
+No middleware needed:
+
+```typescript
+router.get("/status", getStatus);
+```
+
+### Authenticated Endpoint
+
+Requires valid token:
+
+```typescript
+router.get("/profile", verifyToken, getProfile);
+```
+
+### Role-Based Endpoint
+
+Requires specific role:
+
+```typescript
+router.post("/usuarios", verifyToken, requireRol("Admin"), createUsuario);
+```
+
+### Multi-Role Endpoint
+
+Allows multiple roles:
+
+```typescript
+router.get("/clientes", verifyToken, requireRol("Admin", "Empleado"), getAllCliente);
+```
+
+### Client-Only Endpoint
+
+Only for users with cliente account:
+
+```typescript
+router.get("/cuenta", verifyToken, requireCliente, getMiCuenta);
+```
+
+### Rate-Limited Auth
+
+Prevent brute force:
+
+```typescript
+router.post("/login", authLimiter, login);
+```
+
+## Related Documentation
+
+- [Routes](/generated/routes) - How middleware is applied to routes
+- [Controllers](/generated/controllers) - Using req.user in controllers
+- [Security](/architecture/security) - Overall security architecture

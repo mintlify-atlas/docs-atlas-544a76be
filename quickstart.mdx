@@ -1,80 +1,520 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Build your first REST API with Softwart Backend in minutes
 ---
 
-## Get started in three steps
+## Create Your Project
 
-Get your documentation site running locally and make your first customization.
+Generate a new backend application using the CLI:
 
-### Step 1: Set up your local environment
+```bash
+create-backend-app my-optics-api
+```
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+This creates a complete MVC project structure:
 
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+```bash
+✅ Proyecto my-optics-api creado con éxito
+```
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  If you don't specify a project name, it defaults to `project-root`.
 </Note>
+
+## Project Structure
+
+The CLI generates the following structure:
+
+```
+my-optics-api/
+├── src/
+│   ├── config/          # Configuration files
+│   ├── controllers/     # Request handlers
+│   ├── models/          # TypeORM entities
+│   ├── routes/          # Express routes
+│   ├── services/        # Business logic
+│   ├── middlewares/     # Custom middleware
+│   ├── validators/      # Input validation
+│   ├── errors/          # Error handling
+│   ├── utils/           # Helper functions
+│   ├── app.ts           # Express app configuration
+│   ├── server.js        # Server entry point
+│   └── data-source.ts   # TypeORM configuration
+├── tests/               # Test files
+├── .env                 # Environment variables
+├── .gitignore
+├── package.json
+└── README.md
+```
+
+## Install Dependencies
+
+Navigate to your project and install dependencies:
+
+<Steps>
+  <Step title="Enter Project Directory">
+    ```bash
+    cd my-optics-api
+    ```
+  </Step>
+
+  <Step title="Install Packages">
+    ```bash
+    npm install
+    ```
+    
+    This installs the required dependencies:
+    - `express` - Web framework
+    - `typeorm` - ORM for database operations
+    - `pg` - PostgreSQL driver
+    - `bcrypt` - Password hashing
+    - `jsonwebtoken` - JWT authentication
+    - `express-rate-limit` - Rate limiting
+    - `dotenv` - Environment variables
+  </Step>
+</Steps>
+
+## Configure Database
+
+Update the `.env` file with your PostgreSQL credentials:
+
+```bash .env
+PORT=3000
+
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=your_password
+DB_NAME=my_optics_db
+
+NODE_ENV=development
+```
+
+<Warning>
+  Make sure the database exists before starting the server. The TypeORM configuration uses `synchronize: true` in development, which automatically creates tables.
+</Warning>
+
+## Generate Your First Model
+
+Use the model generator to create a TypeORM entity. For example, let's create a `Cliente` (Customer) model:
+
+```bash
+node ../generate-model.js
+```
+
+The generator creates entities based on the schema defined in `generate-model.js`. Here's an example of a generated model:
+
+```typescript src/models/Cliente.ts
+import { Column, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn } from "typeorm";
+import { Cita } from "./Cita";
+import { Venta } from "./Venta";
+
+@Entity("cliente")
+export class Cliente {
+
+  @PrimaryGeneratedColumn()
+  id_cliente!: number;
+
+  @Column()
+  tipoDocumento!: string;
+
+  @Column()
+  documento!: string;
+
+  @Column()
+  nombre!: string;
+
+  @Column({ unique: true })
+  correo!: string;
+
+  @Column({ nullable: true })
+  telefono?: string;
+
+  @Column({ type: "boolean" })
+  estado!: boolean;
+
+  @OneToMany(() => Cita, (x) => x.cliente)
+  citas!: Cita[];
+
+  @OneToMany(() => Venta, (x) => x.cliente)
+  ventas!: Venta[];
+
+}
+```
+
+## Generate Controllers
+
+Generate CRUD controllers for your models:
+
+```bash
+node ../generate-controllers.js
+```
+
+Output:
+```bash
+════════════════════════════════════════════════════════
+  🚀  generate-controllers.js
+════════════════════════════════════════════════════════
+
+────────────────────────────────────────────────────────
+  🎮  CONTROLADORES
+────────────────────────────────────────────────────────
+  ✅  controllers/ClienteController.ts
+  ✅  controllers/UsuarioController.ts
+  ...
+
+────────────────────────────────────────────────────────
+  🌱  ÍNDICE DE SEEDS
+────────────────────────────────────────────────────────
+  ✅  seeds/index.ts
+
+════════════════════════════════════════════════════════
+  🎉  16 archivos generados, 0 errores
+════════════════════════════════════════════════════════
+```
+
+This generates controllers with complete CRUD operations:
+
+```typescript src/controllers/ClienteController.ts
+export const getAllCliente = async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const clienteRepo = AppDataSource.getRepository(Cliente);
+    const items = await clienteRepo.find();
+    res.json({ success: true, data: items });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Error al obtener Cliente", error });
+  }
+};
+
+export const createCliente = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const clienteRepo = AppDataSource.getRepository(Cliente);
+    const required = ["tipoDocumento", "documento", "nombre", "correo"];
+    const missing = required.filter(k => req.body[k] === undefined);
+    if (missing.length) { 
+      res.status(400).json({ 
+        success: false, 
+        message: `Campos requeridos: ${missing.join(", ")}` 
+      }); 
+      return; 
+    }
+    const obj = clienteRepo.create();
+    obj.tipoDocumento = req.body.tipoDocumento;
+    obj.documento = req.body.documento;
+    obj.nombre = req.body.nombre;
+    obj.correo = req.body.correo;
+    obj.telefono = req.body.telefono;
+    obj.estado = req.body.estado !== undefined ? req.body.estado : true;
+
+    await clienteRepo.save(obj);
+    res.status(201).json({ 
+      success: true, 
+      message: "Cliente creado exitosamente", 
+      data: obj 
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: "Error al crear Cliente", 
+      error 
+    });
+  }
+};
+```
+
+## Generate Routes
+
+Generate Express routes for your controllers:
+
+```bash
+node ../generate-routes.js
+```
+
+Output:
+```bash
+════════════════════════════════════════════════════════
+  🚀  generate-routes.js
+════════════════════════════════════════════════════════
+
+────────────────────────────────────────────────────────
+  🛣   ARCHIVOS DE RUTAS
+────────────────────────────────────────────────────────
+  ✅  routes/ClienteRoutes.ts
+  ✅  routes/UsuarioRoutes.ts
+  ...
+
+────────────────────────────────────────────────────────
+  📋  ÍNDICE DE RUTAS
+────────────────────────────────────────────────────────
+  ✅  routes/index.ts
+
+════════════════════════════════════════════════════════
+  🎉  16 archivos generados, 0 errores
+════════════════════════════════════════════════════════
+```
+
+Generated routes include:
+
+```typescript src/routes/ClienteRoutes.ts
+import { Router } from "express";
+import { 
+  getAllCliente, 
+  getClienteById, 
+  createCliente, 
+  updateCliente, 
+  deleteCliente, 
+  toggleEstadoCliente 
+} from "../controllers/ClienteController";
+
+const router = Router();
+
+// GET    /           → listar todos
+router.get("/", getAllCliente);
+
+// GET    /:id        → obtener uno por ID
+router.get("/:id", getClienteById);
+
+// POST   /           → crear nuevo
+router.post("/", createCliente);
+
+// PUT    /:id        → actualizar
+router.put("/:id", updateCliente);
+
+// DELETE /:id        → eliminar (valida dependencias)
+router.delete("/:id", deleteCliente);
+
+// PATCH  /:id/estado → activar / inactivar
+router.patch("/:id/estado", toggleEstadoCliente);
+
+export { router as clienteRouter };
+```
+
+## Start the Development Server
+
+Start your server in development mode:
+
+```bash
+npm run dev
+```
+
+You should see:
+
+```bash
+🔌  Conectando a la base de datos...
+✅  Base de datos conectada
+
+🌱  Iniciando semilla...
+✅  Semilla completada
+
+🚀  Servidor corriendo en http://localhost:3000
+```
+
+<Note>
+  The server uses `nodemon` in development mode, which automatically restarts when you modify files.
+</Note>
+
+## Test Your API
+
+The application automatically creates REST endpoints for all your models.
+
+### Health Check
+
+Test that the server is running:
+
+```bash
+curl http://localhost:3000/
+```
+
+Response:
+```json
+{
+  "success": true,
+  "message": "API en línea 🚀",
+  "timestamp": "2026-03-06T10:30:00.000Z"
+}
+```
+
+### Create a Customer
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST http://localhost:3000/api/clientes \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tipoDocumento": "DNI",
+    "documento": "12345678",
+    "nombre": "Juan Pérez",
+    "correo": "juan@example.com",
+    "telefono": "+51999888777"
+  }'
+```
+
+```javascript JavaScript (Fetch)
+const response = await fetch('http://localhost:3000/api/clientes', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    tipoDocumento: 'DNI',
+    documento: '12345678',
+    nombre: 'Juan Pérez',
+    correo: 'juan@example.com',
+    telefono: '+51999888777'
+  })
+});
+
+const data = await response.json();
+console.log(data);
+```
+
+```python Python (Requests)
+import requests
+
+response = requests.post(
+    'http://localhost:3000/api/clientes',
+    json={
+        'tipoDocumento': 'DNI',
+        'documento': '12345678',
+        'nombre': 'Juan Pérez',
+        'correo': 'juan@example.com',
+        'telefono': '+51999888777'
+    }
+)
+
+print(response.json())
+```
+
+</CodeGroup>
+
+Response:
+```json
+{
+  "success": true,
+  "message": "Cliente creado exitosamente",
+  "data": {
+    "id_cliente": 1,
+    "tipoDocumento": "DNI",
+    "documento": "12345678",
+    "nombre": "Juan Pérez",
+    "correo": "juan@example.com",
+    "telefono": "+51999888777",
+    "estado": true
+  }
+}
+```
+
+### List All Customers
+
+```bash
+curl http://localhost:3000/api/clientes
+```
+
+Response:
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id_cliente": 1,
+      "tipoDocumento": "DNI",
+      "documento": "12345678",
+      "nombre": "Juan Pérez",
+      "correo": "juan@example.com",
+      "telefono": "+51999888777",
+      "estado": true
+    }
+  ]
+}
+```
+
+### Get Customer by ID
+
+```bash
+curl http://localhost:3000/api/clientes/1
+```
+
+### Update Customer
+
+```bash
+curl -X PUT http://localhost:3000/api/clientes/1 \
+  -H "Content-Type: application/json" \
+  -d '{"telefono": "+51988777666"}'
+```
+
+### Toggle Customer Status
+
+```bash
+curl -X PATCH http://localhost:3000/api/clientes/1/estado
+```
+
+Response:
+```json
+{
+  "success": true,
+  "message": "Cliente inactivado",
+  "data": {
+    "estado": false
+  }
+}
+```
+
+### Delete Customer
+
+```bash
+curl -X DELETE http://localhost:3000/api/clientes/1
+```
+
+<Warning>
+  Deletion validates foreign key constraints. If the customer has related records (appointments, sales), the operation will fail with a 409 Conflict error.
+</Warning>
+
+## Available Endpoints
+
+All generated models have the same CRUD endpoints:
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/<resource>` | List all records |
+| GET | `/api/<resource>/:id` | Get one record by ID |
+| POST | `/api/<resource>` | Create new record |
+| PUT | `/api/<resource>/:id` | Update record |
+| DELETE | `/api/<resource>/:id` | Delete record (validates dependencies) |
+| PATCH | `/api/<resource>/:id/estado` | Toggle active/inactive status |
+
+## Built-in Features
+
+Your application includes:
+
+<CardGroup cols={2}>
+  <Card title="Rate Limiting" icon="shield-halved">
+    Automatic rate limiting on all `/api/*` endpoints
+  </Card>
+  <Card title="CORS" icon="globe">
+    Cross-Origin Resource Sharing configured
+  </Card>
+  <Card title="Error Handling" icon="triangle-exclamation">
+    Centralized error handling with custom error classes
+  </Card>
+  <Card title="Validation" icon="check">
+    Request validation with required field checking
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="lock" href="/concepts/authentication">
+    Learn about JWT authentication and authorization
+  </Card>
+  <Card title="Database Configuration" icon="database" href="/configuration/database">
+    Configure TypeORM for production
+  </Card>
+  <Card title="Generated Code" icon="code" href="/generated/controllers">
+    Understand generated controller patterns
+  </Card>
+  <Card title="API Reference" icon="book" href="/api/auth/registro">
+    Explore the complete API documentation
+  </Card>
+</CardGroup>

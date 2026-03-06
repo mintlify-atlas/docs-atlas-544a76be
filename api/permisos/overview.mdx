@@ -1,0 +1,445 @@
+---
+title: 'Permisos API'
+description: 'API endpoints for managing system permissions'
+---
+
+## Authentication
+
+All Permiso endpoints require authentication. Include a valid JWT token in the Authorization header.
+
+## List All Permissions
+
+<api>GET /api/permiso</api>
+
+Retrieves a list of all permissions in the system.
+
+### Headers
+
+<ParamField header="Authorization" type="string" required>
+  Bearer token for authentication
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Indicates if the request was successful
+</ResponseField>
+
+<ResponseField name="data" type="array">
+  Array of permission objects
+  
+  <ResponseField name="id_permiso" type="number">
+    Unique identifier for the permission
+  </ResponseField>
+  
+  <ResponseField name="nombre" type="string">
+    Permission name
+  </ResponseField>
+  
+  <ResponseField name="descripcion" type="string">
+    Permission description
+  </ResponseField>
+  
+  <ResponseField name="estado" type="boolean">
+    Permission's active status (true = active, false = inactive)
+  </ResponseField>
+</ResponseField>
+
+<ResponseExample>
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id_permiso": 1,
+      "nombre": "usuarios.crear",
+      "descripcion": "Permiso para crear nuevos usuarios",
+      "estado": true
+    },
+    {
+      "id_permiso": 2,
+      "nombre": "usuarios.editar",
+      "descripcion": "Permiso para editar usuarios existentes",
+      "estado": true
+    }
+  ]
+}
+```
+</ResponseExample>
+
+---
+
+## Get Permission by ID
+
+<api>GET /api/permiso/:id</api>
+
+Retrieves a specific permission by its ID.
+
+### Path Parameters
+
+<ParamField path="id" type="number" required>
+  The unique identifier of the permission
+</ParamField>
+
+### Headers
+
+<ParamField header="Authorization" type="string" required>
+  Bearer token for authentication
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Indicates if the request was successful
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  Permission object
+  
+  <ResponseField name="id_permiso" type="number">
+    Unique identifier for the permission
+  </ResponseField>
+  
+  <ResponseField name="nombre" type="string">
+    Permission name
+  </ResponseField>
+  
+  <ResponseField name="descripcion" type="string">
+    Permission description
+  </ResponseField>
+  
+  <ResponseField name="estado" type="boolean">
+    Permission's active status
+  </ResponseField>
+</ResponseField>
+
+<ResponseExample>
+```json
+{
+  "success": true,
+  "data": {
+    "id_permiso": 1,
+    "nombre": "usuarios.crear",
+    "descripcion": "Permiso para crear nuevos usuarios",
+    "estado": true
+  }
+}
+```
+</ResponseExample>
+
+### Error Responses
+
+<ResponseField name="404" type="object">
+  Permission not found
+  
+  ```json
+  {
+    "success": false,
+    "message": "Permiso no encontrado"
+  }
+  ```
+</ResponseField>
+
+---
+
+## Create Permission
+
+<api>POST /api/permiso</api>
+
+Creates a new permission in the system.
+
+### Headers
+
+<ParamField header="Authorization" type="string" required>
+  Bearer token for authentication
+</ParamField>
+
+<ParamField header="Content-Type" type="string" required>
+  application/json
+</ParamField>
+
+### Body Parameters
+
+<ParamField body="nombre" type="string" required>
+  Permission name (e.g., "usuarios.crear", "productos.eliminar")
+</ParamField>
+
+<ParamField body="descripcion" type="string" required>
+  Permission description explaining what this permission allows
+</ParamField>
+
+<ParamField body="estado" type="boolean" optional default="true">
+  Permission's active status (defaults to true)
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Indicates if the request was successful
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Success message
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  Created permission object
+</ResponseField>
+
+<ResponseExample>
+```json Request
+{
+  "nombre": "productos.crear",
+  "descripcion": "Permiso para crear nuevos productos en el inventario",
+  "estado": true
+}
+```
+
+```json Response (201 Created)
+{
+  "success": true,
+  "message": "Permiso creado exitosamente",
+  "data": {
+    "id_permiso": 15,
+    "nombre": "productos.crear",
+    "descripcion": "Permiso para crear nuevos productos en el inventario",
+    "estado": true
+  }
+}
+```
+</ResponseExample>
+
+### Error Responses
+
+<ResponseField name="400" type="object">
+  Missing required fields
+  
+  ```json
+  {
+    "success": false,
+    "message": "Campos requeridos: nombre, descripcion"
+  }
+  ```
+</ResponseField>
+
+<Tip>
+Use a consistent naming convention for permissions, such as `resource.action` (e.g., "usuarios.crear", "productos.editar", "ventas.ver").
+</Tip>
+
+---
+
+## Update Permission
+
+<api>PUT /api/permiso/:id</api>
+
+Updates an existing permission's information.
+
+### Path Parameters
+
+<ParamField path="id" type="number" required>
+  The unique identifier of the permission to update
+</ParamField>
+
+### Headers
+
+<ParamField header="Authorization" type="string" required>
+  Bearer token for authentication
+</ParamField>
+
+<ParamField header="Content-Type" type="string" required>
+  application/json
+</ParamField>
+
+### Body Parameters
+
+All fields are optional. Only include fields you want to update.
+
+<ParamField body="nombre" type="string" optional>
+  Permission name
+</ParamField>
+
+<ParamField body="descripcion" type="string" optional>
+  Permission description
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Indicates if the request was successful
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Success message
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  Updated permission object
+</ResponseField>
+
+<ResponseExample>
+```json Request
+{
+  "descripcion": "Permiso para crear y duplicar productos en el inventario"
+}
+```
+
+```json Response
+{
+  "success": true,
+  "message": "Permiso actualizado",
+  "data": {
+    "id_permiso": 15,
+    "nombre": "productos.crear",
+    "descripcion": "Permiso para crear y duplicar productos en el inventario",
+    "estado": true
+  }
+}
+```
+</ResponseExample>
+
+### Error Responses
+
+<ResponseField name="404" type="object">
+  Permission not found
+  
+  ```json
+  {
+    "success": false,
+    "message": "Permiso no encontrado"
+  }
+  ```
+</ResponseField>
+
+---
+
+## Delete Permission
+
+<api>DELETE /api/permiso/:id</api>
+
+Permanently deletes a permission from the system.
+
+### Path Parameters
+
+<ParamField path="id" type="number" required>
+  The unique identifier of the permission to delete
+</ParamField>
+
+### Headers
+
+<ParamField header="Authorization" type="string" required>
+  Bearer token for authentication
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Indicates if the request was successful
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Success message
+</ResponseField>
+
+<ResponseExample>
+```json
+{
+  "success": true,
+  "message": "Permiso eliminado correctamente"
+}
+```
+</ResponseExample>
+
+### Error Responses
+
+<ResponseField name="404" type="object">
+  Permission not found
+  
+  ```json
+  {
+    "success": false,
+    "message": "Permiso no encontrado"
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="409" type="object">
+  Permission has associated records and cannot be deleted
+  
+  ```json
+  {
+    "success": false,
+    "message": "No se puede eliminar: existen PermisoRol asociados (3)"
+  }
+  ```
+</ResponseField>
+
+<Warning>
+A permission cannot be deleted if it has associated PermisoRol records (roles that have this permission assigned). Consider using the toggle estado endpoint to deactivate permissions instead.
+</Warning>
+
+---
+
+## Toggle Permission Status
+
+<api>PATCH /api/permiso/:id/toggle-estado</api>
+
+Toggles the active status of a permission (active/inactive).
+
+### Path Parameters
+
+<ParamField path="id" type="number" required>
+  The unique identifier of the permission
+</ParamField>
+
+### Headers
+
+<ParamField header="Authorization" type="string" required>
+  Bearer token for authentication
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Indicates if the request was successful
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Success message indicating whether the permission was activated or deactivated
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  Object containing the new status
+  
+  <ResponseField name="estado" type="boolean">
+    The new active status
+  </ResponseField>
+</ResponseField>
+
+<ResponseExample>
+```json
+{
+  "success": true,
+  "message": "Permiso inactivado",
+  "data": {
+    "estado": false
+  }
+}
+```
+</ResponseExample>
+
+### Error Responses
+
+<ResponseField name="404" type="object">
+  Permission not found
+  
+  ```json
+  {
+    "success": false,
+    "message": "Permiso no encontrado"
+  }
+  ```
+</ResponseField>
+
+<Tip>
+Deactivating a permission is preferable to deleting it, as it maintains referential integrity while preventing its use in new role assignments.
+</Tip>

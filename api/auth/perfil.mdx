@@ -1,0 +1,135 @@
+---
+title: 'Ver Perfil'
+api: 'GET /api/cuenta/perfil'
+description: 'Obtiene la información del perfil del cliente autenticado'
+---
+
+Este endpoint devuelve toda la información del perfil del cliente actualmente autenticado, incluyendo datos personales y de contacto.
+
+## Autenticación
+
+<ParamField header="Authorization" type="string" required>
+  Token Bearer JWT obtenido del endpoint de login
+</ParamField>
+
+Solo clientes autenticados con `id_cliente` en el token pueden acceder a este endpoint.
+
+## Respuesta
+
+<ResponseField name="success" type="boolean">
+  Indica si la operación fue exitosa
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  Información completa del perfil del cliente
+  
+  <ResponseField name="id_cliente" type="number">
+    ID único del cliente
+  </ResponseField>
+  
+  <ResponseField name="tipoDocumento" type="string">
+    Tipo de documento (CC, TI, CE, etc.)
+  </ResponseField>
+  
+  <ResponseField name="documento" type="string">
+    Número de documento de identidad
+  </ResponseField>
+  
+  <ResponseField name="nombre" type="string">
+    Nombre completo del cliente
+  </ResponseField>
+  
+  <ResponseField name="correo" type="string">
+    Correo electrónico
+  </ResponseField>
+  
+  <ResponseField name="telefono" type="string | null">
+    Número de teléfono de contacto
+  </ResponseField>
+  
+  <ResponseField name="estado" type="boolean">
+    Estado activo/inactivo del cliente
+  </ResponseField>
+</ResponseField>
+
+## Ejemplo de solicitud
+
+```bash
+curl -X GET https://api.softwart.com/api/cuenta/perfil \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+```javascript
+const token = localStorage.getItem('token');
+
+const response = await fetch('https://api.softwart.com/api/cuenta/perfil', {
+  method: 'GET',
+  headers: {
+    'Authorization': `Bearer ${token}`
+  }
+});
+
+const data = await response.json();
+```
+
+## Respuesta exitosa
+
+```json
+{
+  "success": true,
+  "data": {
+    "id_cliente": 15,
+    "tipoDocumento": "CC",
+    "documento": "1234567890",
+    "nombre": "Juan Pérez",
+    "correo": "juan.perez@example.com",
+    "telefono": "3001234567",
+    "estado": true
+  }
+}
+```
+
+## Respuestas de error
+
+<ResponseExample>
+```json 401 - No autenticado
+{
+  "success": false,
+  "message": "Token no proporcionado"
+}
+```
+
+```json 401 - Token inválido
+{
+  "success": false,
+  "message": "Token inválido"
+}
+```
+
+```json 404 - Perfil no encontrado
+{
+  "success": false,
+  "message": "Perfil no encontrado"
+}
+```
+
+```json 500 - Error del servidor
+{
+  "success": false,
+  "message": "Error al obtener perfil",
+  "error": {}
+}
+```
+</ResponseExample>
+
+## Actualizar perfil
+
+Para actualizar la información del perfil, usa el endpoint [PUT /api/cuenta/perfil](/api/cuenta/editar-perfil).
+
+## Notas
+
+- Requiere autenticación con token JWT válido
+- El `id_cliente` se extrae automáticamente del token JWT
+- Solo el cliente autenticado puede ver su propio perfil
+- El estado `false` indica que la cuenta fue desactivada
+- Los usuarios Admin/Empleado sin `id_cliente` no pueden acceder a este endpoint

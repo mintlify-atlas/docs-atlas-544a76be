@@ -1,0 +1,487 @@
+---
+title: "TypeORM Integration"
+description: "Understanding TypeORM entities, relations, and database operations in Softwart Backend"
+---
+
+# TypeORM Integration
+
+Softwart Backend uses **TypeORM** as its Object-Relational Mapper (ORM) to interact with PostgreSQL databases. TypeORM provides type-safe database operations, automatic schema synchronization, and a clean API for managing entities and relations.
+
+## What is TypeORM?
+
+TypeORM is a TypeScript ORM that allows you to:
+- Define database tables as TypeScript classes
+- Query data using type-safe methods
+- Manage relationships between entities
+- Handle migrations and schema changes
+- Support multiple database systems (PostgreSQL, MySQL, SQLite, etc.)
+
+## DataSource Configuration
+
+The central configuration for TypeORM is the `AppDataSource` in `src/data-source.ts`:
+
+```typescript title="src/data-source.ts" lines
+import "reflect-metadata";
+import { DataSource } from "typeorm";
+import { Permiso, Rol, Usuario, Cliente, Cita, Venta /* ... */ } from "./models";
+
+export const AppDataSource = new DataSource({
+  type: "postgres",
+  host: process.env.DB_HOST ?? "localhost",
+  port: Number(process.env.DB_PORT ?? 5432),
+  username: process.env.DB_USER ?? "root",
+  password: process.env.DB_PASSWORD ?? "",
+  database: process.env.DB_NAME ?? "mi_base_de_datos",
+  synchronize: true,  // Auto-create/update tables (dev only)
+  logging: true,      // Log SQL queries to console
+  entities: [
+    Permiso, Rol, PermisoRol, Usuario,
+    Cliente, Servicio, EstadoCita, EstadoServicio,
+    MetodoPago, EstadoPago, Cita, Marco, Venta,
+    DetalleVenta, Pago,
+  ],
+});
+```
+
+### Configuration Options
+
+<ParamField path="type" type="string" required>
+  Database type - `"postgres"`, `"mysql"`, `"sqlite"`, etc.
+</ParamField>
+
+<ParamField path="host" type="string">
+  Database server hostname (default: `"localhost"`)
+</ParamField>
+
+<ParamField path="port" type="number">
+  Database server port (default: `5432` for PostgreSQL)
+</ParamField>
+
+<ParamField path="username" type="string">
+  Database user
+</ParamField>
+
+<ParamField path="password" type="string">
+  Database password
+</ParamField>
+
+<ParamField path="database" type="string">
+  Database name
+</ParamField>
+
+<ParamField path="synchronize" type="boolean">
+  Auto-create/update database schema. **Must be `false` in production.**
+</ParamField>
+
+<ParamField path="logging" type="boolean">
+  Log all SQL queries to console (useful for debugging)
+</ParamField>
+
+<ParamField path="entities" type="array">
+  List of entity classes to register with TypeORM
+</ParamField>
+
+<Warning>
+Never use `synchronize: true` in production! It can cause data loss. Use migrations instead.
+</Warning>
+
+## Entity Decorators
+
+TypeORM uses **decorators** to map TypeScript classes to database tables.
+
+### Basic Entity
+
+```typescript title="src/models/Cliente.ts" lines
+import { Column, Entity, PrimaryGeneratedColumn } from "typeorm";
+
+@Entity("cliente")
+export class Cliente {
+  @PrimaryGeneratedColumn()
+  id_cliente!: number;
+
+  @Column()
+  tipoDocumento!: string;
+
+  @Column({ unique: true })
+  documento!: string;
+
+  @Column()
+  nombre!: string;
+
+  @Column({ unique: true })
+  correo!: string;
+
+  @Column()
+  telefono?: string;
+
+  @Column({ type: "boolean" })
+  estado!: boolean;
+}
+```
+
+### Decorator Reference
+
+**`@Entity(tableName)`**
+- Marks a class as a database entity
+- `tableName` specifies the table name in the database
+
+**`@PrimaryGeneratedColumn()`**
+- Auto-incrementing primary key
+- Default type is `integer`
+
+**`@Column(options)`**
+- Maps a property to a table column
+- Options: `type`, `unique`, `nullable`, `default`, `length`
+
+**`@ManyToOne(target, inverseSide)`**
+- Many-to-one relationship (foreign key)
+- Paired with `@JoinColumn({ name: "fk_column" })`
+
+**`@OneToMany(target, inverseSide)`**
+- One-to-many relationship (reverse side of many-to-one)
+- No physical column in database
+
+**`@OneToOne(target, inverseSide)`**
+- One-to-one relationship
+- Owner side uses `@JoinColumn()`
+
+**`@ManyToMany(target, inverseSide)`**
+- Many-to-many relationship
+- Requires junction table
+
+## Entity Relations
+
+### Many-to-One / One-to-Many
+
+The most common relationship type connects a child entity to a parent.
+
+**Many-to-One (Child Side)**:
+```typescript title="src/models/Usuario.ts" lines
+import { ManyToOne, JoinColumn } from "typeorm";
+import { Rol } from "./Rol";
+
+@Entity("usuario")
+export class Usuario {
+  @PrimaryGeneratedColumn()
+  id_usuario!: number;
+
+  @Column({ unique: true })
+  correo!: string;
+
+  // Many users belong to one role
+  @ManyToOne(() => Rol, (rol) => rol.usuarios)
+  @JoinColumn({ name: "id_rol" })
+  rol!: Rol;
+}
+```
+
+**One-to-Many (Parent Side)**:
+```typescript title="src/models/Rol.ts" lines
+import { OneToMany } from "typeorm";
+import { Usuario } from "./Usuario";
+
+@Entity("rol")
+export class Rol {
+  @PrimaryGeneratedColumn()
+  id_rol!: number;
+
+  @Column()
+  nombre!: string;
+
+  // One role has many users
+  @OneToMany(() => Usuario, (usuario) => usuario.rol)
+  usuarios!: Usuario[];
+}
+```
+
+### One-to-One
+
+Used when one entity is uniquely associated with another.
+
+```typescript
+import { OneToOne, JoinColumn } from "typeorm";
+
+@Entity("usuario")
+export class Usuario {
+  @OneToOne(() => Cliente)
+  @JoinColumn({ name: "id_cliente" })
+  cliente?: Cliente;
+}
+```
+
+### Many-to-Many (Junction Table)
+
+For relationships where both sides can have multiple associations:
+
+```typescript title="src/models/PermisoRol.ts" lines
+import { Entity, ManyToOne, JoinColumn, PrimaryColumn } from "typeorm";
+import { Permiso } from "./Permiso";
+import { Rol } from "./Rol";
+
+@Entity("permiso_rol")
+export class PermisoRol {
+  @PrimaryColumn()
+  id_permiso!: number;
+
+  @PrimaryColumn()
+  id_rol!: number;
+
+  @ManyToOne(() => Permiso, (p) => p.permisoRoles)
+  @JoinColumn({ name: "id_permiso" })
+  permiso!: Permiso;
+
+  @ManyToOne(() => Rol, (r) => r.permisoRoles)
+  @JoinColumn({ name: "id_rol" })
+  rol!: Rol;
+}
+```
+
+<Note>
+Junction tables use `@PrimaryColumn()` on both foreign keys to create a composite primary key.
+</Note>
+
+## Repository Pattern
+
+TypeORM uses the **Repository pattern** to interact with entities.
+
+### Getting a Repository
+
+```typescript
+import { AppDataSource } from "./data-source";
+import { Usuario } from "./models/Usuario";
+
+const usuarioRepo = AppDataSource.getRepository(Usuario);
+```
+
+### Repository Methods
+
+**`find(options)`** - Find multiple entities
+```typescript
+const usuarios = await usuarioRepo.find({
+  where: { estado: true },
+  relations: ["rol"],
+  order: { correo: "ASC" },
+});
+```
+
+**`findOne(options)`** - Find a single entity
+```typescript
+const usuario = await usuarioRepo.findOne({
+  where: { id_usuario: 123 },
+  relations: ["rol"],
+});
+```
+
+**`create(data)`** - Create entity instance (not saved yet)
+```typescript
+const nuevoUsuario = usuarioRepo.create({
+  correo: "user@example.com",
+  clave: "hashed_password",
+  estado: true,
+  rol: { id_rol: 2 },
+});
+```
+
+**`save(entity)`** - Insert or update entity
+```typescript
+const saved = await usuarioRepo.save(nuevoUsuario);
+```
+
+**`update(criteria, partialEntity)`** - Update matching entities
+```typescript
+await usuarioRepo.update({ id_usuario: 123 }, { estado: false });
+```
+
+**`delete(criteria)`** - Delete matching entities
+```typescript
+await usuarioRepo.delete({ id_usuario: 123 });
+```
+
+**`count(options)`** - Count entities
+```typescript
+const total = await usuarioRepo.count({ where: { estado: true } });
+```
+
+## Querying with Relations
+
+TypeORM loads relations only when explicitly requested.
+
+### Load Relations
+
+```typescript
+// Without relations
+const usuario = await usuarioRepo.findOne({
+  where: { id_usuario: 123 },
+});
+// usuario.rol is undefined
+
+// With relations
+const usuarioConRol = await usuarioRepo.findOne({
+  where: { id_usuario: 123 },
+  relations: ["rol"],
+});
+// usuarioConRol.rol is loaded
+```
+
+### Nested Relations
+
+```typescript
+const cita = await citaRepo.findOne({
+  where: { id_cita: 1 },
+  relations: ["cliente", "estadoCita", "venta", "venta.pagos"],
+});
+// Loads: cliente, estadoCita, venta, and venta.pagos
+```
+
+### Query Conditions
+
+```typescript
+// Simple condition
+const usuarios = await usuarioRepo.find({
+  where: { estado: true },
+});
+
+// Multiple conditions (AND)
+const usuarios = await usuarioRepo.find({
+  where: { estado: true, rol: { nombre: "Admin" } },
+});
+
+// OR conditions
+import { Or } from "typeorm";
+const usuarios = await usuarioRepo.find({
+  where: [
+    { correo: "admin@example.com" },
+    { correo: "user@example.com" },
+  ],
+});
+```
+
+## Transaction Support
+
+Use transactions for operations that must succeed or fail together:
+
+```typescript
+import { AppDataSource } from "./data-source";
+
+await AppDataSource.transaction(async (manager) => {
+  const ventaRepo = manager.getRepository(Venta);
+  const pagoRepo = manager.getRepository(Pago);
+
+  // Create sale
+  const venta = ventaRepo.create({
+    fecha: new Date(),
+    total: 100,
+    cliente: { id_cliente: 1 },
+  });
+  await ventaRepo.save(venta);
+
+  // Create payment
+  const pago = pagoRepo.create({
+    monto: 100,
+    venta: { id_venta: venta.id_venta },
+  });
+  await pagoRepo.save(pago);
+
+  // Both operations commit together
+});
+```
+
+<Tip>
+Use transactions when creating related entities to ensure data consistency.
+</Tip>
+
+## Query Builder (Advanced)
+
+For complex queries, use the QueryBuilder API:
+
+```typescript
+const usuarios = await usuarioRepo
+  .createQueryBuilder("usuario")
+  .leftJoinAndSelect("usuario.rol", "rol")
+  .where("usuario.estado = :estado", { estado: true })
+  .andWhere("rol.nombre IN (:...roles)", { roles: ["Admin", "Empleado"] })
+  .orderBy("usuario.correo", "ASC")
+  .getMany();
+```
+
+## Common Patterns
+
+### Check if Entity Exists
+
+```typescript
+const existe = await usuarioRepo.findOne({ where: { correo } });
+if (existe) {
+  return res.status(409).json({ success: false, message: "Correo ya registrado" });
+}
+```
+
+### Soft Delete Pattern
+
+Instead of deleting records, toggle an `estado` field:
+
+```typescript
+export const toggleEstadoUsuario = async (req: Request, res: Response) => {
+  const usuario = await usuarioRepo.findOne({ where: { id_usuario: id } });
+  if (!usuario) {
+    return res.status(404).json({ success: false, message: "Usuario no encontrado" });
+  }
+
+  usuario.estado = !usuario.estado;
+  await usuarioRepo.save(usuario);
+
+  res.json({ success: true, data: usuario });
+};
+```
+
+### Cascade Delete Check
+
+Validate dependencies before deletion:
+
+```typescript
+export const deleteRol = async (req: Request, res: Response) => {
+  const usuariosConRol = await usuarioRepo.count({ where: { rol: { id_rol: id } } });
+  if (usuariosConRol > 0) {
+    return res.status(409).json({
+      success: false,
+      message: `No se puede eliminar: ${usuariosConRol} usuario(s) asignado(s)`,
+    });
+  }
+
+  await rolRepo.delete({ id_rol: id });
+  res.json({ success: true, message: "Rol eliminado" });
+};
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Repositories" icon="database">
+    Always use `getRepository()` instead of direct SQL queries for type safety
+  </Card>
+  <Card title="Load Relations Wisely" icon="link">
+    Only load relations you need to avoid performance issues
+  </Card>
+  <Card title="Use Transactions" icon="arrows-rotate">
+    Wrap related operations in transactions for data consistency
+  </Card>
+  <Card title="Disable synchronize in Production" icon="triangle-exclamation">
+    Use migrations instead of auto-schema sync in production
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Database Configuration" icon="gear" href="/configuration/database">
+    Configure TypeORM for development and production
+  </Card>
+  <Card title="Generated Models" icon="table" href="/generated/models">
+    Explore auto-generated entity patterns
+  </Card>
+  <Card title="Authentication" icon="shield" href="/concepts/authentication">
+    Learn about JWT auth and authorization
+  </Card>
+  <Card title="Controllers" icon="code" href="/generated/controllers">
+    See how controllers use repositories
+  </Card>
+</CardGroup>

@@ -1,0 +1,415 @@
+---
+title: Models
+description: TypeORM entity models with decorators and relations
+---
+
+## Overview
+
+All models are auto-generated from the database schema using the `generate-models.js` script. They use TypeORM decorators to define entities, columns, and relationships.
+
+## Model Structure
+
+### Basic Entity Pattern
+
+Every model follows this pattern:
+
+```typescript
+// Generado automáticamente por generate-models.js
+import { Entity, PrimaryGeneratedColumn, Column } from "typeorm";
+
+@Entity("table_name")
+export class EntityName {
+  @PrimaryGeneratedColumn()
+  id_entity!: number;
+
+  @Column()
+  fieldName!: string;
+
+  @Column({ type: "boolean" })
+  estado!: boolean;
+}
+```
+
+## TypeORM Decorators
+
+### Entity Decorator
+
+Defines a class as a database table:
+
+```typescript
+@Entity("usuario")
+export class Usuario {
+  // ...
+}
+```
+
+The string parameter specifies the database table name.
+
+### Column Decorators
+
+#### Primary Key
+
+```typescript
+@PrimaryGeneratedColumn()
+id_usuario!: number;
+```
+
+Auto-incrementing primary key field.
+
+#### Basic Columns
+
+```typescript
+@Column()
+nombre!: string;
+
+@Column({ unique: true })
+correo!: string;
+
+@Column({ nullable: true })
+telefono?: string;
+```
+
+#### Typed Columns
+
+```typescript
+@Column({ type: "boolean" })
+estado!: boolean;
+
+@Column({ type: "date" })
+fecha!: Date;
+
+@Column({ type: "time" })
+hora!: string;
+
+@Column({ type: "decimal", precision: 10, scale: 2 })
+total!: number;
+```
+
+## Relationship Patterns
+
+### ManyToOne Relation
+
+Defines a foreign key relationship where multiple records can reference one parent:
+
+```typescript
+// In Usuario.ts
+import { ManyToOne, JoinColumn } from "typeorm";
+import { Rol } from "./Rol";
+
+@ManyToOne(() => Rol, (x) => x.usuarios)
+@JoinColumn({ name: "id_rol" })
+rol!: Rol;
+```
+
+- First parameter: Function returning the target entity
+- Second parameter: Inverse side of the relation
+- `@JoinColumn`: Specifies the foreign key column name
+
+### OneToMany Relation
+
+Defines the inverse side of a ManyToOne relationship:
+
+```typescript
+// In Cliente.ts
+import { OneToMany } from "typeorm";
+import { Cita } from "./Cita";
+import { Venta } from "./Venta";
+
+@OneToMany(() => Cita, (x) => x.cliente)
+citas!: Cita[];
+
+@OneToMany(() => Venta, (x) => x.cliente)
+ventas!: Venta[];
+```
+
+- First parameter: Target entity
+- Second parameter: Field on the target that references this entity
+- Returns an array of related records
+
+### OneToOne Relation
+
+Defines a one-to-one relationship:
+
+```typescript
+// In Venta.ts
+import { OneToOne, JoinColumn } from "typeorm";
+import { Cita } from "./Cita";
+
+@OneToOne(() => Cita, (x) => x.venta, { nullable: true })
+@JoinColumn({ name: "id_cita"})
+cita?: Cita;
+```
+
+The `nullable: true` option makes the relation optional.
+
+## Example Models
+
+### Usuario Model
+
+**Location:** `src/models/Usuario.ts`
+
+```typescript
+import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
+import { Rol } from "./Rol";
+
+@Entity("usuario")
+export class Usuario {
+  @PrimaryGeneratedColumn()
+  id_usuario!: number;
+
+  @Column({ unique: true })
+  correo!: string;
+
+  @Column()
+  clave!: string;
+
+  @Column({ type: "boolean" })
+  estado!: boolean;
+
+  @ManyToOne(() => Rol, (x) => x.usuarios)
+  @JoinColumn({ name: "id_rol" })
+  rol!: Rol;
+}
+```
+
+**Key Features:**
+- Unique email constraint
+- ManyToOne relation to Rol
+- Boolean estado field for soft deletion
+
+### Cliente Model
+
+**Location:** `src/models/Cliente.ts`
+
+```typescript
+import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
+import { Cita } from "./Cita";
+import { Venta } from "./Venta";
+
+@Entity("cliente")
+export class Cliente {
+  @PrimaryGeneratedColumn()
+  id_cliente!: number;
+
+  @Column()
+  tipoDocumento!: string;
+
+  @Column({ unique: true })
+  documento!: string;
+
+  @Column()
+  nombre!: string;
+
+  @Column({ unique: true })
+  correo!: string;
+
+  @Column({ nullable: true })
+  telefono?: string;
+
+  @Column({ type: "boolean" })
+  estado!: boolean;
+
+  @OneToMany(() => Cita, (x) => x.cliente)
+  citas!: Cita[];
+
+  @OneToMany(() => Venta, (x) => x.cliente)
+  ventas!: Venta[];
+}
+```
+
+**Key Features:**
+- Multiple OneToMany relations (citas and ventas)
+- Optional telephone field
+- Unique constraints on documento and correo
+
+### Venta Model
+
+**Location:** `src/models/Venta.ts`
+
+```typescript
+import { Column, Entity, JoinColumn, ManyToOne, OneToMany, OneToOne, PrimaryGeneratedColumn } from "typeorm";
+import { Cita } from "./Cita";
+import { Cliente } from "./Cliente";
+import { DetalleVenta } from "./DetalleVenta";
+import { Pago } from "./Pago";
+
+@Entity("venta")
+export class Venta {
+  @PrimaryGeneratedColumn()
+  id_venta!: number;
+
+  @Column({ type: "date" })
+  fecha!: Date;
+
+  @Column({ type: "decimal", precision: 10, scale: 2 })
+  total!: number;
+
+  @Column({ nullable: true })
+  observacion?: string;
+
+  @Column({ type: "boolean" })
+  estado!: boolean;
+
+  @OneToOne(() => Cita, (x) => x.venta, { nullable: true })
+  @JoinColumn({ name: "id_cita"})
+  cita?: Cita;
+
+  @ManyToOne(() => Cliente, (x) => x.ventas)
+  @JoinColumn({ name: "id_cliente" })
+  cliente!: Cliente;
+
+  @OneToMany(() => DetalleVenta, (x) => x.venta)
+  detallesVenta!: DetalleVenta[];
+
+  @OneToMany(() => Pago, (x) => x.venta)
+  pagos!: Pago[];
+}
+```
+
+**Key Features:**
+- Decimal column for monetary values
+- Optional OneToOne relation to Cita
+- Multiple relation types (OneToOne, ManyToOne, OneToMany)
+
+### DetalleVenta Model
+
+**Location:** `src/models/DetalleVenta.ts`
+
+```typescript
+import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
+import { EstadoServicio } from "./EstadoServicio";
+import { Marco } from "./Marco";
+import { Servicio } from "./Servicio";
+import { Venta } from "./Venta";
+
+@Entity("detalle_venta")
+export class DetalleVenta {
+  @PrimaryGeneratedColumn()
+  id_detalle!: number;
+
+  @Column({ type: "date" })
+  fecha!: Date;
+
+  @Column()
+  observacion!: string;
+
+  @Column({ type: "decimal", precision: 10, scale: 2 })
+  precio!: number;
+
+  @Column({ type: "boolean" })
+  estado!: boolean;
+
+  @ManyToOne(() => Venta, (x) => x.detallesVenta)
+  @JoinColumn({ name: "id_venta" })
+  venta!: Venta;
+
+  @ManyToOne(() => Servicio, (x) => x.detallesVenta)
+  @JoinColumn({ name: "id_servicio" })
+  servicio!: Servicio;
+
+  @ManyToOne(() => EstadoServicio, (x) => x.detallesVenta)
+  @JoinColumn({ name: "id_estado" })
+  estadoServicio!: EstadoServicio;
+
+  @ManyToOne(() => Marco, (x) => x.detallesVenta, { nullable: true })
+  @JoinColumn({ name: "id_marco"})
+  marco?: Marco;
+}
+```
+
+**Key Features:**
+- Multiple ManyToOne relations
+- Optional relation to Marco
+- Demonstrates junction table pattern
+
+## Field Conventions
+
+### Required vs Optional
+
+```typescript
+// Required field (will throw error if missing)
+@Column()
+nombre!: string;
+
+// Optional field (can be undefined)
+@Column({ nullable: true })
+telefono?: string;
+```
+
+Use `!` for required fields and `?` for optional fields.
+
+### Naming Conventions
+
+- **Primary Keys:** `id_<entity_name>` (e.g., `id_usuario`, `id_cliente`)
+- **Foreign Keys:** `id_<related_entity>` (e.g., `id_rol`, `id_cliente`)
+- **Boolean Fields:** Typically `estado` for active/inactive status
+- **Table Names:** Lowercase, singular (e.g., `usuario`, `cliente`, `detalle_venta`)
+
+## Common Patterns
+
+### Soft Delete Pattern
+
+All entities include an `estado` boolean field:
+
+```typescript
+@Column({ type: "boolean" })
+estado!: boolean;
+```
+
+This enables soft deletion where records are marked inactive instead of being removed.
+
+### Audit Fields
+
+Some models include temporal fields:
+
+```typescript
+@Column({ type: "date" })
+fecha!: Date;
+
+@Column({ type: "time" })
+hora!: string;
+```
+
+### Unique Constraints
+
+```typescript
+@Column({ unique: true })
+correo!: string;
+
+@Column({ unique: true })
+documento!: string;
+```
+
+Enforces uniqueness at the database level.
+
+## Generation Process
+
+Models are automatically generated using:
+
+```bash
+node scripts/generate-models.js
+```
+
+The generator:
+1. Reads the database schema
+2. Creates TypeORM entity classes
+3. Adds appropriate decorators
+4. Establishes bidirectional relations
+5. Generates TypeScript types
+
+<Note>
+All generated files include the comment `// Generado automáticamente por generate-models.js` at the top.
+</Note>
+
+## Best Practices
+
+1. **Don't Edit Generated Files:** Regenerate models when schema changes
+2. **Use Relations:** Always load relations when needed with `{ relations: ["field"] }`
+3. **Type Safety:** The `!` operator ensures TypeORM initializes required fields
+4. **Circular Dependencies:** Use function syntax `() => Entity` to avoid import issues
+
+## Related Documentation
+
+- [Controllers](/generated/controllers) - How models are used in controllers
+- [Routes](/generated/routes) - API endpoints for model operations
+- [Database Configuration](/architecture/database) - TypeORM setup and configuration

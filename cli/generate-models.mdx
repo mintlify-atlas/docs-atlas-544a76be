@@ -1,0 +1,334 @@
+---
+title: 'generate-models'
+description: 'Generate TypeORM entity models from schema definition'
+icon: 'database'
+---
+
+## Overview
+
+The `generate-models` command reads a schema definition and generates TypeORM entity classes with full relationship support, composite keys, and proper decorators.
+
+## Command Syntax
+
+```bash
+node generate-model.js
+```
+
+This command:
+- Reads the schema defined in the script
+- Generates TypeORM entity files in `./models/`
+- Handles relationships, composite keys, and constraints
+- Creates properly typed TypeScript classes
+
+## Schema Format
+
+The schema is defined as an array of entity objects in the script:
+
+```javascript
+const schema = [
+  {
+    name: "Usuario",
+    tableName: "usuario",
+    columns: [
+      { name: "id_usuario", dbType: "int", pk: true },
+      { name: "correo", dbType: "varchar", unique: true },
+      { name: "clave", dbType: "varchar" },
+      { name: "estado", dbType: "boolean" },
+    ],
+    relations: [
+      {
+        relType: "ManyToOne",
+        target: "Rol",
+        field: "rol",
+        fkColumn: "id_rol",
+        inverseSide: "usuarios",
+        joinColumn: true,
+      },
+    ],
+  },
+];
+```
+
+## Schema Properties
+
+<ParamField path="name" type="string" required>
+  Entity class name in PascalCase (e.g., "Usuario", "DetalleVenta")
+</ParamField>
+
+<ParamField path="tableName" type="string" required>
+  Database table name (e.g., "usuario", "detalle_venta")
+</ParamField>
+
+<ParamField path="compositeKey" type="boolean" default="false">
+  Set to `true` for junction tables with composite primary keys
+</ParamField>
+
+<ParamField path="columns" type="array" required>
+  Array of column definitions
+</ParamField>
+
+<ParamField path="relations" type="array">
+  Array of relationship definitions
+</ParamField>
+
+## Column Properties
+
+<ParamField path="name" type="string" required>
+  Column name in the database
+</ParamField>
+
+<ParamField path="dbType" type="string" required>
+  Database type: `int`, `varchar`, `text`, `boolean`, `date`, `datetime`, `float`, `decimal`, etc.
+</ParamField>
+
+<ParamField path="pk" type="boolean" default="false">
+  Mark as primary key (generates `@PrimaryGeneratedColumn()`)
+</ParamField>
+
+<ParamField path="unique" type="boolean" default="false">
+  Add unique constraint
+</ParamField>
+
+<ParamField path="nullable" type="boolean" default="false">
+  Allow NULL values
+</ParamField>
+
+## Relationship Properties
+
+<ParamField path="relType" type="string" required>
+  Relationship type: `ManyToOne`, `OneToMany`, `OneToOne`
+</ParamField>
+
+<ParamField path="target" type="string" required>
+  Target entity name
+</ParamField>
+
+<ParamField path="field" type="string" required>
+  Property name in this entity
+</ParamField>
+
+<ParamField path="fkColumn" type="string">
+  Foreign key column name (for ManyToOne side)
+</ParamField>
+
+<ParamField path="inverseSide" type="string" required>
+  Property name in the target entity
+</ParamField>
+
+<ParamField path="joinColumn" type="boolean" default="false">
+  Add `@JoinColumn` decorator (owner side of relationship)
+</ParamField>
+
+<ParamField path="primaryColumn" type="boolean" default="false">
+  Use `@PrimaryColumn` instead of regular column (for composite keys)
+</ParamField>
+
+<ParamField path="nullable" type="boolean" default="false">
+  Allow NULL foreign key values
+</ParamField>
+
+<ParamField path="owner" type="boolean">
+  For OneToOne: true if this side has @JoinColumn, false otherwise
+</ParamField>
+
+## Type Mappings
+
+The generator automatically converts database types to TypeScript types:
+
+| Database Type | TypeScript Type |
+|--------------|------------------|
+| `int`, `integer`, `float`, `double`, `decimal`, `numeric` | `number` |
+| `varchar`, `text`, `char` | `string` |
+| `boolean`, `bool` | `boolean` |
+| `date`, `datetime`, `timestamp` | `Date` |
+| `time` | `string` |
+
+## Generated Output Examples
+
+### Simple Entity
+
+<CodeGroup>
+```typescript Usuario.ts
+// Generado automáticamente por generate-models.js
+import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn } from "typeorm";
+import { Rol } from "./Rol";
+
+@Entity("usuario")
+export class Usuario {
+
+  @PrimaryGeneratedColumn()
+  id_usuario!: number;
+
+  @Column({ unique: true })
+  correo!: string;
+
+  @Column()
+  clave!: string;
+
+  @Column({ type: "boolean" })
+  estado!: boolean;
+
+  @ManyToOne(() => Rol, (x) => x.usuarios)
+  @JoinColumn({ name: "id_rol" })
+  rol!: Rol;
+
+}
+```
+
+```typescript Rol.ts
+// Generado automáticamente por generate-models.js
+import { Entity, Column, OneToMany, PrimaryGeneratedColumn } from "typeorm";
+import { Usuario } from "./Usuario";
+
+@Entity("rol")
+export class Rol {
+
+  @PrimaryGeneratedColumn()
+  id_rol!: number;
+
+  @Column()
+  nombre!: string;
+
+  @Column({ type: "boolean" })
+  estado!: boolean;
+
+  @OneToMany(() => Usuario, (x) => x.rol)
+  usuarios!: Usuario[];
+
+}
+```
+</CodeGroup>
+
+### Composite Key (Junction Table)
+
+```typescript PermisoRol.ts
+// Generado automáticamente por generate-models.js
+import { Entity, ManyToOne, PrimaryColumn, JoinColumn } from "typeorm";
+import { Permiso } from "./Permiso";
+import { Rol } from "./Rol";
+
+@Entity("permiso_rol")
+export class PermisoRol {
+
+  @ManyToOne(() => Permiso, (x) => x.permisoRoles)
+  @PrimaryColumn({ name: "id_permiso" })
+  @JoinColumn({ name: "id_permiso" })
+  permiso!: Permiso;
+
+  @ManyToOne(() => Rol, (x) => x.permisoRoles)
+  @PrimaryColumn({ name: "id_rol" })
+  @JoinColumn({ name: "id_rol" })
+  rol!: Rol;
+
+}
+```
+
+### OneToOne Relationship
+
+<CodeGroup>
+```typescript Venta.ts (Owner side)
+@Entity("venta")
+export class Venta {
+  @PrimaryGeneratedColumn()
+  id_venta!: number;
+
+  // Owner side has @JoinColumn
+  @OneToOne(() => Cita, (x) => x.venta, { nullable: true })
+  @JoinColumn({ name: "id_cita", nullable: true })
+  cita?: Cita;
+}
+```
+
+```typescript Cita.ts (Inverse side)
+@Entity("cita")
+export class Cita {
+  @PrimaryGeneratedColumn()
+  id_cita!: number;
+
+  // Inverse side without @JoinColumn
+  @OneToOne(() => Venta, (x) => x.cita)
+  venta?: Venta;
+}
+```
+</CodeGroup>
+
+## Output
+
+When you run the generator:
+
+```bash
+📁  Carpeta creada: /path/to/models
+✅  Permiso.ts
+✅  Rol.ts
+✅  PermisoRol.ts
+✅  Usuario.ts
+✅  Cliente.ts
+✅  Servicio.ts
+✅  EstadoCita.ts
+✅  Cita.ts
+✅  Venta.ts
+✅  DetalleVenta.ts
+✅  Pago.ts
+
+🎉  Listo — 11 modelos generados, 0 errores.
+📂  Carpeta: /path/to/models
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="Define schema carefully">
+    Plan your database schema before generating. The generator creates TypeORM entities based on your schema definition.
+  </Step>
+
+  <Step title="Use composite keys correctly">
+    For junction tables, set `compositeKey: true` and mark foreign key columns with `primaryColumn: true`.
+  </Step>
+
+  <Step title="Set inverse sides properly">
+    Always specify `inverseSide` to create bidirectional relationships.
+  </Step>
+
+  <Step title="Handle nullable relationships">
+    Use `nullable: true` for optional foreign keys and OneToOne relationships.
+  </Step>
+</Steps>
+
+## Relationship Types Explained
+
+### ManyToOne / OneToMany
+
+Use when multiple records in one table relate to a single record in another:
+
+- **ManyToOne**: Many users belong to one role
+- **OneToMany**: One role has many users
+
+### OneToOne
+
+Use when each record relates to exactly one record in another table:
+
+- One sale can have one appointment
+- Set `owner: true` on the side with the foreign key column
+
+### Composite Primary Keys
+
+Use for junction/pivot tables:
+
+```javascript
+{
+  name: "PermisoRol",
+  compositeKey: true,
+  relations: [
+    {
+      relType: "ManyToOne",
+      target: "Permiso",
+      joinColumn: true,
+      primaryColumn: true,  // Part of composite PK
+    },
+  ]
+}
+```
+
+<Note>
+The generator automatically handles imports, decorators, and TypeScript types. You don't need to manually configure TypeORM decorators.
+</Note>

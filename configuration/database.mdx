@@ -1,0 +1,147 @@
+---
+title: Database Configuration
+description: Configure TypeORM DataSource and PostgreSQL connections for Softwart Backend
+---
+
+## Overview
+
+The Softwart Backend uses TypeORM as the ORM layer with PostgreSQL as the database. The configuration is centralized in `data-source.ts` and supports both development and production environments.
+
+## DataSource Configuration
+
+The application uses a single TypeORM DataSource instance exported from `src/data-source.ts`.
+
+### Development Configuration
+
+In development mode, the DataSource is configured with automatic synchronization and query logging:
+
+```typescript
+export const AppDataSource = new DataSource({
+  type:        "postgres",
+  host:        process.env.DB_HOST     ?? "localhost",
+  port:        Number(process.env.DB_PORT ?? 5432),
+  username:    process.env.DB_USER     ?? "root",
+  password:    process.env.DB_PASSWORD ?? "",
+  database:    process.env.DB_NAME     ?? "mi_base_de_datos",
+  synchronize: true,   // Auto-creates/updates tables
+  logging:     true,   // Shows queries in console
+  entities: [
+    Permiso, Rol, PermisoRol, Usuario,
+    Cliente, Servicio, EstadoCita, EstadoServicio,
+    MetodoPago, EstadoPago, Cita, Marco, Venta,
+    DetalleVenta, Pago,
+  ],
+});
+```
+
+### Key Configuration Options
+
+| Option | Development | Production | Description |
+|--------|------------|------------|-------------|
+| `synchronize` | `true` | `false` | Auto-creates/updates database schema |
+| `logging` | `true` | `false` | Logs SQL queries to console |
+| `ssl` | Not required | Required | SSL configuration for remote databases |
+
+<Warning>
+  Never use `synchronize: true` in production. This can lead to data loss. Use migrations instead.
+</Warning>
+
+## Production Configuration
+
+For production deployments (Supabase, Render, etc.), use this configuration:
+
+```typescript
+export const AppDataSource = new DataSource({
+  type:        "postgres",
+  host:        process.env.DB_HOST,
+  port:        Number(process.env.DB_PORT ?? 5432),
+  username:    process.env.DB_USER,
+  password:    process.env.DB_PASSWORD,
+  database:    process.env.DB_NAME,
+  synchronize: false,   // Never in production
+  logging:     false,
+  ssl: {
+    rejectUnauthorized: false,  // Required for Supabase/Render
+  },
+  entities: [
+    // Same entities as development
+  ],
+  // migrations: ["dist/migrations/*.js"],
+});
+```
+
+### SSL Configuration
+
+Most cloud PostgreSQL providers (Supabase, Render, AWS RDS) require SSL connections. Configure SSL with:
+
+```typescript
+ssl: {
+  rejectUnauthorized: false
+}
+```
+
+## Database Initialization
+
+The DataSource is initialized in `app.ts` during application bootstrap:
+
+```typescript
+async function bootstrap(): Promise<void> {
+  try {
+    console.log("\n🔌  Conectando a la base de datos...");
+    await AppDataSource.initialize();
+    console.log("✅  Base de datos conectada\n");
+
+    // Run seeds
+    await runAllSeeds();
+
+    app.listen(PORT, () => {
+      console.log(`🚀  Servidor corriendo en http://localhost:${PORT}\n`);
+    });
+  } catch (error) {
+    console.error("❌  Error al iniciar la aplicación:", error);
+    process.exit(1);
+  }
+}
+```
+
+Reference: `src/data-source.ts:36-52`, `src/app.ts:29-45`
+
+## Entity Registration
+
+All entities must be registered in the `entities` array:
+
+```typescript
+entities: [
+  Permiso, Rol, PermisoRol, Usuario,
+  Cliente, Servicio, EstadoCita, EstadoServicio,
+  MetodoPago, EstadoPago, Cita, Marco, Venta,
+  DetalleVenta, Pago,
+]
+```
+
+## Using the DataSource
+
+Import and use the DataSource in your controllers:
+
+```typescript
+import { AppDataSource } from "../data-source";
+import { Usuario } from "../models/Usuario";
+
+const usuarioRepo = AppDataSource.getRepository(Usuario);
+const usuarios = await usuarioRepo.find();
+```
+
+## Related Configuration
+
+- [Environment Variables](/configuration/environment) - Database connection variables
+- [Security Configuration](/configuration/security) - JWT and authentication setup
+
+## Best Practices
+
+<Tip>
+  - Use migrations in production instead of `synchronize`
+  - Enable `logging` only in development for debugging
+  - Store database credentials in environment variables
+  - Use SSL for all production database connections
+  - Test database connection before starting the server
+</Tip>

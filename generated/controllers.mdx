@@ -1,0 +1,500 @@
+---
+title: Controllers
+description: CRUD controller methods and business logic patterns
+---
+
+## Overview
+
+Controllers handle HTTP request/response logic and interact with TypeORM repositories to perform CRUD operations. Most controllers are auto-generated and follow consistent patterns.
+
+## Controller Structure
+
+### Basic Pattern
+
+Each controller exports 5-6 standard functions:
+
+```typescript
+import { Request, Response } from "express";
+import { AppDataSource } from "../data-source";
+import { Entity } from "../models/Entity";
+
+export const getAllEntity = async (_req: Request, res: Response): Promise<void> => { };
+export const getEntityById = async (req: Request, res: Response): Promise<void> => { };
+export const createEntity = async (req: Request, res: Response): Promise<void> => { };
+export const updateEntity = async (req: Request, res: Response): Promise<void> => { };
+export const deleteEntity = async (req: Request, res: Response): Promise<void> => { };
+export const toggleEstadoEntity = async (req: Request, res: Response): Promise<void> => { };
+```
+
+## CRUD Methods
+
+### Get All (List)
+
+**Example:** `getAllCliente` in `src/controllers/ClienteController.ts:11`
+
+```typescript
+export const getAllCliente = async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const clienteRepo = AppDataSource.getRepository(Cliente);
+    const items = await clienteRepo.find();
+    res.json({ success: true, data: items });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Error al obtener Cliente", error });
+  }
+};
+```
+
+**With Relations:**
+
+```typescript
+export const getAllCita = async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const citaRepo = AppDataSource.getRepository(Cita);
+    const items = await citaRepo.find({ relations: ["estadoCita", "cliente"] });
+    res.json({ success: true, data: items });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Error al obtener Cita", error });
+  }
+};
+```
+
+**Key Points:**
+- Uses `find()` to retrieve all records
+- Specify `relations` array to eagerly load related entities
+- Returns `{ success: true, data: [...] }` format
+
+### Get By ID
+
+**Example:** `getClienteById` in `src/controllers/ClienteController.ts:21`
+
+```typescript
+export const getClienteById = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const clienteRepo = AppDataSource.getRepository(Cliente);
+    const item = await clienteRepo.findOne({
+      where: { id_cliente: Number(req.params.id) },
+    });
+    if (!item) { 
+      res.status(404).json({ success: false, message: "Cliente no encontrado" }); 
+      return; 
+    }
+    res.json({ success: true, data: item });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Error al obtener Cliente", error });
+  }
+};
+```
+
+**With Relations:**
+
+```typescript
+export const getUsuarioById = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const usuarioRepo = AppDataSource.getRepository(Usuario);
+    const item = await usuarioRepo.findOne({
+      where: { id_usuario: Number(req.params.id) },
+      relations: ["rol"],
+    });
+    if (!item) { 
+      res.status(404).json({ success: false, message: "Usuario no encontrado" }); 
+      return; 
+    }
+    res.json({ success: true, data: sinClave(item) });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Error al obtener Usuario", error });
+  }
+};
+```
+
+**Key Points:**
+- Uses `findOne()` with `where` clause
+- Converts `req.params.id` to number
+- Returns 404 if not found
+- Can load relations with `relations` option
+
+### Create
+
+**Example:** `createCliente` in `src/controllers/ClienteController.ts:35`
+
+```typescript
+export const createCliente = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const clienteRepo = AppDataSource.getRepository(Cliente);
+    const required = ["tipoDocumento", "documento", "nombre", "correo"];
+    const missing = required.filter(k => req.body[k] === undefined);
+    if (missing.length) { 
+      res.status(400).json({ 
+        success: false, 
+        message: `Campos requeridos: ${missing.join(", ")}` 
+      }); 
+      return; 
+    }
+    const obj = clienteRepo.create();
+    obj.tipoDocumento = req.body.tipoDocumento;
+    obj.documento = req.body.documento;
+    obj.nombre = req.body.nombre;
+    obj.correo = req.body.correo;
+    obj.telefono = req.body.telefono;
+    obj.estado = req.body.estado !== undefined ? req.body.estado : true;
+
+    await clienteRepo.save(obj);
+    res.status(201).json({ success: true, message: "Cliente creado exitosamente", data: obj });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Error al crear Cliente", error });
+  }
+};
+```
+
+**With Relations:**
+
+```typescript
+export const createCita = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const citaRepo = AppDataSource.getRepository(Cita);
+    const required = ["fecha", "hora"];
+    const missing = required.filter(k => req.body[k] === undefined);
+    if (missing.length) { 
+      res.status(400).json({ 
+        success: false, 
+        message: `Campos requeridos: ${missing.join(", ")}` 
+      }); 
+      return; 
+    }
+    const obj = citaRepo.create();
+    obj.fecha = req.body.fecha;
+    obj.hora = req.body.hora;
+    
+    if (req.body.id_estado_cita !== undefined) {
+      const estadoCitaRepo = AppDataSource.getRepository(EstadoCita);
+      const relEstadoCita = await estadoCitaRepo.findOneBy({ 
+        id_estado_cita: Number(req.body.id_estado_cita) 
+      });
+      if (!relEstadoCita) { 
+        res.status(404).json({ success: false, message: "EstadoCita no encontrado" }); 
+        return; 
+      }
+      obj.estadoCita = relEstadoCita;
+    }
+    
+    if (req.body.id_cliente !== undefined) {
+      const clienteRepo = AppDataSource.getRepository(Cliente);
+      const relCliente = await clienteRepo.findOneBy({ 
+        id_cliente: Number(req.body.id_cliente) 
+      });
+      if (!relCliente) { 
+        res.status(404).json({ success: false, message: "Cliente no encontrado" }); 
+        return; 
+      }
+      obj.cliente = relCliente;
+    }
+    
+    await citaRepo.save(obj);
+    res.status(201).json({ success: true, message: "Cita creado exitosamente", data: obj });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Error al crear Cita", error });
+  }
+};
+```
+
+**Key Points:**
+- Validates required fields before processing
+- Uses `create()` to instantiate entity
+- Sets default values (e.g., `estado: true`)
+- For relations, fetches related entity first
+- Returns 404 if related entity not found
+- Returns 201 status on success
+
+### Update
+
+**Example:** `updateCliente` in `src/controllers/ClienteController.ts:56`
+
+```typescript
+export const updateCliente = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const clienteRepo = AppDataSource.getRepository(Cliente);
+    const item = await clienteRepo.findOne({
+      where: { id_cliente: Number(req.params.id) },
+    });
+    if (!item) { 
+      res.status(404).json({ success: false, message: "Cliente no encontrado" }); 
+      return; 
+    }
+    if (req.body.tipoDocumento !== undefined) item.tipoDocumento = req.body.tipoDocumento;
+    if (req.body.documento !== undefined) item.documento = req.body.documento;
+    if (req.body.nombre !== undefined) item.nombre = req.body.nombre;
+    if (req.body.correo !== undefined) item.correo = req.body.correo;
+    if (req.body.telefono !== undefined) item.telefono = req.body.telefono;
+
+    await clienteRepo.save(item);
+    res.json({ success: true, message: "Cliente actualizado", data: item });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Error al actualizar Cliente", error });
+  }
+};
+```
+
+**Key Points:**
+- Finds existing record first
+- Only updates provided fields (partial update)
+- Uses conditional assignment: `if (req.body.field !== undefined)`
+- For relations, fetches and validates related entity
+
+### Delete
+
+**Example:** `deleteCliente` in `src/controllers/ClienteController.ts:76`
+
+```typescript
+export const deleteCliente = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const clienteRepo = AppDataSource.getRepository(Cliente);
+    const citaRepo = AppDataSource.getRepository(Cita);
+    const countCita = await citaRepo.count({ 
+      where: { cliente: { id_cliente: Number(req.params.id) } } 
+    });
+    if (countCita > 0) {
+      res.status(409).json({ 
+        success: false, 
+        message: `No se puede eliminar: existen Cita asociados (${countCita})` 
+      }); 
+      return;
+    }
+    const ventaRepo = AppDataSource.getRepository(Venta);
+    const countVenta = await ventaRepo.count({ 
+      where: { cliente: { id_cliente: Number(req.params.id) } } 
+    });
+    if (countVenta > 0) {
+      res.status(409).json({ 
+        success: false, 
+        message: `No se puede eliminar: existen Venta asociados (${countVenta})` 
+      }); 
+      return;
+    }
+    const item = await clienteRepo.findOneBy({ id_cliente: Number(req.params.id) });
+    if (!item) { 
+      res.status(404).json({ success: false, message: "Cliente no encontrado" }); 
+      return; 
+    }
+    await clienteRepo.remove(item);
+    res.json({ success: true, message: "Cliente eliminado correctamente" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Error al eliminar Cliente", error });
+  }
+};
+```
+
+**Key Points:**
+- Checks for dependent records before deletion
+- Returns 409 Conflict if dependencies exist
+- Uses `remove()` for hard deletion
+- Prevents orphaned records
+
+### Toggle Estado (Soft Delete)
+
+**Example:** `toggleEstadoCliente` in `src/controllers/ClienteController.ts:98`
+
+```typescript
+export const toggleEstadoCliente = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const clienteRepo = AppDataSource.getRepository(Cliente);
+    const item = await clienteRepo.findOneBy({ id_cliente: Number(req.params.id) });
+    if (!item) { 
+      res.status(404).json({ success: false, message: "Cliente no encontrado" }); 
+      return; 
+    }
+    item.estado = !item.estado;
+    await clienteRepo.save(item);
+    res.json({ 
+      success: true, 
+      message: `Cliente ${item.estado ? "activado" : "inactivado"}`, 
+      data: { estado: item.estado } 
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Error al cambiar estado de Cliente", error });
+  }
+};
+```
+
+**Key Points:**
+- Toggles boolean `estado` field
+- Implements soft delete pattern
+- Returns current estado in response
+
+## Special Patterns
+
+### Password Hashing
+
+**Example:** `createUsuario` in `src/controllers/UsuarioController.ts:37`
+
+```typescript
+import bcrypt from "bcrypt";
+
+export const createUsuario = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const usuarioRepo = AppDataSource.getRepository(Usuario);
+    const required = ["correo", "clave"];
+    const missing = required.filter(k => req.body[k] === undefined);
+    if (missing.length) { 
+      res.status(400).json({ 
+        success: false, 
+        message: `Campos requeridos: ${missing.join(", ")}` 
+      }); 
+      return; 
+    }
+    const obj = usuarioRepo.create();
+    obj.correo = req.body.correo;
+    obj.clave  = await bcrypt.hash(req.body.clave, 10);
+    obj.estado = req.body.estado !== undefined ? req.body.estado : true;
+    if (req.body.id_rol !== undefined) {
+      const rolRepo = AppDataSource.getRepository(Rol);
+      const relRol  = await rolRepo.findOneBy({ id_rol: Number(req.body.id_rol) });
+      if (!relRol) { 
+        res.status(404).json({ success: false, message: "Rol no encontrado" }); 
+        return; 
+      }
+      obj.rol = relRol;
+    }
+    await usuarioRepo.save(obj);
+    res.status(201).json({ 
+      success: true, 
+      message: "Usuario creado exitosamente", 
+      data: sinClave(obj) 
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Error al crear Usuario", error });
+  }
+};
+```
+
+### Hiding Sensitive Fields
+
+**Example:** `sinClave` helper in `src/controllers/UsuarioController.ts:11`
+
+```typescript
+// Helper: elimina la clave del objeto antes de enviarlo
+const sinClave = ({ clave, ...rest }: Usuario) => rest;
+
+export const getAllUsuario = async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const usuarioRepo = AppDataSource.getRepository(Usuario);
+    const items = await usuarioRepo.find({ relations: ["rol"] });
+    res.json({ success: true, data: items.map(sinClave) });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Error al obtener Usuario", error });
+  }
+};
+```
+
+**Key Points:**
+- Uses destructuring to exclude password field
+- Applied to all responses containing Usuario
+- Prevents password leakage in API responses
+
+## Response Formats
+
+### Success Response
+
+```typescript
+res.json({ 
+  success: true, 
+  data: item 
+});
+
+res.status(201).json({ 
+  success: true, 
+  message: "Cliente creado exitosamente", 
+  data: obj 
+});
+```
+
+### Error Responses
+
+```typescript
+// Not Found (404)
+res.status(404).json({ 
+  success: false, 
+  message: "Cliente no encontrado" 
+});
+
+// Bad Request (400)
+res.status(400).json({ 
+  success: false, 
+  message: `Campos requeridos: ${missing.join(", ")}` 
+});
+
+// Conflict (409)
+res.status(409).json({ 
+  success: false, 
+  message: `No se puede eliminar: existen Cita asociados (${countCita})` 
+});
+
+// Server Error (500)
+res.status(500).json({ 
+  success: false, 
+  message: "Error al crear Cliente", 
+  error 
+});
+```
+
+## Repository Methods
+
+### Common TypeORM Methods
+
+```typescript
+const repo = AppDataSource.getRepository(Entity);
+
+// Find all
+await repo.find();
+await repo.find({ relations: ["field"] });
+
+// Find one
+await repo.findOne({ where: { id: 1 } });
+await repo.findOneBy({ id: 1 });
+
+// Count
+await repo.count({ where: { estado: true } });
+
+// Create and save
+const obj = repo.create();
+obj.field = value;
+await repo.save(obj);
+
+// Remove
+await repo.remove(obj);
+```
+
+## Generation Process
+
+Controllers are generated using:
+
+```bash
+node scripts/generate-controllers.js
+```
+
+The generator creates:
+- All CRUD methods
+- Validation logic
+- Relation handling
+- Error responses
+- Dependency checks for deletion
+
+<Note>
+Generated controllers include the comment:
+`// Generado automáticamente por generate-controllers.js`
+</Note>
+
+## Best Practices
+
+1. **Always validate required fields** before processing
+2. **Check entity existence** before update/delete
+3. **Verify related entities exist** when setting relations
+4. **Use try-catch** for all async operations
+5. **Return appropriate status codes** (200, 201, 404, 409, 500)
+6. **Hide sensitive data** (passwords, tokens) in responses
+7. **Check dependencies** before hard deletion
+8. **Use consistent response format** with `success` and `message` fields
+
+## Related Documentation
+
+- [Models](/generated/models) - Entity definitions and decorators
+- [Routes](/generated/routes) - How controllers are mapped to endpoints
+- [Middlewares](/generated/middlewares) - Authentication and validation

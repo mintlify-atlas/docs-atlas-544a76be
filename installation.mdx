@@ -1,0 +1,161 @@
+---
+title: Installation
+description: Install and configure the Softwart Backend CLI for building MVC applications
+---
+
+## Prerequisites
+
+Before installing Softwart Backend, ensure you have the following installed on your system:
+
+<CardGroup cols={2}>
+  <Card title="Node.js" icon="node-js">
+    Version 14.x or higher
+  </Card>
+  <Card title="PostgreSQL" icon="database">
+    Version 12.x or higher
+  </Card>
+</CardGroup>
+
+<Note>
+  TypeScript support is included out of the box. The framework uses TypeORM with TypeScript for type-safe database operations.
+</Note>
+
+### Verify Prerequisites
+
+Check that you have the required versions installed:
+
+```bash
+node --version
+# Should output v14.x.x or higher
+
+psql --version
+# Should output PostgreSQL 12.x or higher
+```
+
+## Install the CLI
+
+Install the Softwart Backend CLI globally using npm:
+
+```bash
+npm install -g backend-softwart-mvc
+```
+
+This installs the `create-backend-app` command globally on your system.
+
+<Warning>
+  If you encounter permission errors on Linux/macOS, you may need to use `sudo` or configure npm to use a different directory. See [npm's documentation](https://docs.npmjs.com/resolving-eacces-permissions-errors-when-installing-packages-globally) for details.
+</Warning>
+
+## Verify Installation
+
+Confirm the CLI is installed correctly:
+
+```bash
+which create-backend-app
+# Should output the path to the executable
+```
+
+The CLI is now ready to create new projects.
+
+## Database Setup
+
+Create a PostgreSQL database for your application:
+
+<Steps>
+  <Step title="Connect to PostgreSQL">
+    Open a terminal and connect to PostgreSQL:
+    
+    ```bash
+    psql -U postgres
+    ```
+  </Step>
+
+  <Step title="Create Database">
+    Create a new database:
+    
+    ```sql
+    CREATE DATABASE my_backend_db;
+    ```
+  </Step>
+
+  <Step title="Create User (Optional)">
+    Create a dedicated database user:
+    
+    ```sql
+    CREATE USER backend_user WITH ENCRYPTED PASSWORD 'your_secure_password';
+    GRANT ALL PRIVILEGES ON DATABASE my_backend_db TO backend_user;
+    ```
+  </Step>
+
+  <Step title="Exit PostgreSQL">
+    ```sql
+    \q
+    ```
+  </Step>
+</Steps>
+
+## Environment Configuration
+
+After creating your project (see [Quickstart](/quickstart)), configure the database connection.
+
+The generated project includes a `.env` file with the following structure:
+
+```bash .env
+PORT=3000
+
+# Database Configuration
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=your_password
+DB_NAME=my_backend_db
+
+# Environment
+NODE_ENV=development
+```
+
+<Note>
+  The `.env` file is automatically added to `.gitignore` to prevent accidentally committing sensitive credentials.
+</Note>
+
+## TypeScript Configuration
+
+The generated project includes a `tsconfig.json` with optimal settings:
+
+```json tsconfig.json
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "lib": ["ES2020"],
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "resolveJsonModule": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart Guide" icon="rocket" href="/quickstart">
+    Create your first project and build a REST API
+  </Card>
+  <Card title="MVC Architecture" icon="folder-tree" href="/concepts/mvc-structure">
+    Understand the MVC architecture
+  </Card>
+  <Card title="CLI Commands" icon="terminal" href="/cli/create-app">
+    Learn the code generation commands
+  </Card>
+  <Card title="TypeORM Integration" icon="database" href="/concepts/typeorm-integration">
+    Work with entities and relations
+  </Card>
+</CardGroup>

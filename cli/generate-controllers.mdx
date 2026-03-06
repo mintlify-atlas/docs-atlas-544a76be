@@ -1,0 +1,482 @@
+---
+title: 'generate-controllers'
+description: 'Generate Express controllers with CRUD operations and validation'
+icon: 'code'
+---
+
+## Overview
+
+The `generate-controllers` command creates Express.js controllers with complete CRUD operations, relationship handling, dependency validation, and catalog seeding functions.
+
+## Command Syntax
+
+```bash
+node generate-controllers.js
+```
+
+This command:
+- Generates TypeScript controller files in `./controllers/`
+- Creates CRUD endpoints with full validation
+- Handles relationships and foreign keys
+- Validates dependencies before deletion
+- Generates seed data functions for catalogs
+- Creates a centralized `seeds/index.ts` file
+
+## Controller Schema Format
+
+Define your controllers in the script:
+
+```javascript
+const entities = [
+  {
+    name: "Usuario",
+    file: "UsuarioController",
+    pkField: "id_usuario",
+    hasEstado: true,
+    dependents: [],
+    fields: [
+      { name: "correo", type: "string" },
+      { name: "clave", type: "string" },
+      { name: "rol", type: "relation", fk: "id_rol" },
+      { name: "estado", type: "boolean", default: true },
+    ],
+  },
+];
+```
+
+## Schema Properties
+
+<ParamField path="name" type="string" required>
+  Entity class name (must match the model name)
+</ParamField>
+
+<ParamField path="file" type="string" required>
+  Controller filename without extension (e.g., "UsuarioController")
+</ParamField>
+
+<ParamField path="pkField" type="string">
+  Primary key field name. Use `null` for composite keys.
+</ParamField>
+
+<ParamField path="hasEstado" type="boolean" default="false">
+  Generates a `toggleEstado` endpoint to activate/deactivate records
+</ParamField>
+
+<ParamField path="isJunction" type="boolean" default="false">
+  Set `true` for junction tables with composite keys
+</ParamField>
+
+<ParamField path="dependents" type="array">
+  Child entities that prevent deletion
+</ParamField>
+
+<ParamField path="fields" type="array" required>
+  Field definitions for validation and assignment
+</ParamField>
+
+<ParamField path="relations" type="array">
+  Relation names to include in queries (for eager loading)
+</ParamField>
+
+<ParamField path="catalogValues" type="array">
+  Seed data for catalog tables
+</ParamField>
+
+<ParamField path="extraEndpoints" type="array">
+  Additional custom endpoints (for state changes, assignments, etc.)
+</ParamField>
+
+## Field Properties
+
+<ParamField path="name" type="string" required>
+  Field name
+</ParamField>
+
+<ParamField path="type" type="string" required>
+  Field type: `string`, `number`, `boolean`, `Date`, or `relation`
+</ParamField>
+
+<ParamField path="fk" type="string">
+  Foreign key column name (required when `type: "relation"`)
+</ParamField>
+
+<ParamField path="nullable" type="boolean" default="false">
+  Allow null values
+</ParamField>
+
+<ParamField path="default" type="any">
+  Default value
+</ParamField>
+
+## Dependents Configuration
+
+Prevent deletion when child records exist:
+
+```javascript
+dependents: [
+  { entity: "Usuario", field: "rol" },
+  { entity: "PermisoRol", field: "rol" },
+]
+```
+
+- **entity**: Child entity name
+- **field**: Foreign key field in the child entity
+
+## Generated Endpoints
+
+For a standard entity like `Usuario`, the generator creates:
+
+### GET /
+
+Retrieve all records with relations:
+
+```typescript
+export const getAllUsuario = async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const usuarioRepo = AppDataSource.getRepository(Usuario);
+    const items = await usuarioRepo.find({ relations: ["rol"] });
+    res.json({ success: true, data: items });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Error al obtener Usuario", error });
+  }
+};
+```
+
+### GET /:id
+
+Retrieve a single record by ID:
+
+```typescript
+export const getUsuarioById = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const usuarioRepo = AppDataSource.getRepository(Usuario);
+    const item = await usuarioRepo.findOne({
+      where: { id_usuario: Number(req.params.id) },
+      relations: ["rol"],
+    });
+    if (!item) {
+      res.status(404).json({ success: false, message: "Usuario no encontrado" });
+      return;
+    }
+    res.json({ success: true, data: item });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Error al obtener Usuario", error });
+  }
+};
+```
+
+### POST /
+
+Create a new record with validation:
+
+```typescript
+export const createUsuario = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const usuarioRepo = AppDataSource.getRepository(Usuario);
+    const obj = usuarioRepo.create();
+    obj.correo = req.body.correo;
+    obj.clave = req.body.clave;
+    obj.estado = req.body.estado !== undefined ? req.body.estado : true;
+    
+    if (req.body.id_rol !== undefined) {
+      const rolRepo = AppDataSource.getRepository(Rol);
+      const relRol = await rolRepo.findOneBy({ id_rol: Number(req.body.id_rol) });
+      if (!relRol) {
+        res.status(404).json({ success: false, message: "Rol no encontrado" });
+        return;
+      }
+      obj.rol = relRol;
+    }
+    
+    await usuarioRepo.save(obj);
+    res.status(201).json({ success: true, message: "Usuario creado exitosamente", data: obj });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Error al crear Usuario", error });
+  }
+};
+```
+
+### PUT /:id
+
+Update an existing record:
+
+```typescript
+export const updateUsuario = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const usuarioRepo = AppDataSource.getRepository(Usuario);
+    const item = await usuarioRepo.findOne({
+      where: { id_usuario: Number(req.params.id) },
+      relations: ["rol"],
+    });
+    if (!item) {
+      res.status(404).json({ success: false, message: "Usuario no encontrado" });
+      return;
+    }
+    
+    if (req.body.correo !== undefined) item.correo = req.body.correo;
+    if (req.body.clave !== undefined) item.clave = req.body.clave;
+    
+    if (req.body.id_rol !== undefined) {
+      const rolRepo = AppDataSource.getRepository(Rol);
+      const relRol = await rolRepo.findOneBy({ id_rol: Number(req.body.id_rol) });
+      if (!relRol) {
+        res.status(404).json({ success: false, message: "Rol no encontrado" });
+        return;
+      }
+      item.rol = relRol;
+    }
+    
+    await usuarioRepo.save(item);
+    res.json({ success: true, message: "Usuario actualizado", data: item });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Error al actualizar Usuario", error });
+  }
+};
+```
+
+### DELETE /:id
+
+Delete with dependency validation:
+
+```typescript
+export const deleteRol = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const rolRepo = AppDataSource.getRepository(Rol);
+    
+    // Check dependencies
+    const usuarioRepo = AppDataSource.getRepository(Usuario);
+    const countUsuario = await usuarioRepo.count({
+      where: { rol: { id_rol: Number(req.params.id) } }
+    });
+    if (countUsuario > 0) {
+      res.status(409).json({
+        success: false,
+        message: `No se puede eliminar: existen Usuario asociados (${countUsuario})`
+      });
+      return;
+    }
+    
+    const item = await rolRepo.findOneBy({ id_rol: Number(req.params.id) });
+    if (!item) {
+      res.status(404).json({ success: false, message: "Rol no encontrado" });
+      return;
+    }
+    
+    await rolRepo.remove(item);
+    res.json({ success: true, message: "Rol eliminado correctamente" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Error al eliminar Rol", error });
+  }
+};
+```
+
+### PATCH /:id/estado
+
+Toggle estado field (when `hasEstado: true`):
+
+```typescript
+export const toggleEstadoUsuario = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const usuarioRepo = AppDataSource.getRepository(Usuario);
+    const item = await usuarioRepo.findOneBy({ id_usuario: Number(req.params.id) });
+    if (!item) {
+      res.status(404).json({ success: false, message: "Usuario no encontrado" });
+      return;
+    }
+    
+    item.estado = !item.estado;
+    await usuarioRepo.save(item);
+    res.json({
+      success: true,
+      message: `Usuario ${item.estado ? "activado" : "inactivado"}`,
+      data: { estado: item.estado }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Error al cambiar estado de Usuario", error });
+  }
+};
+```
+
+## Catalog Seeding
+
+For catalog entities, define seed data:
+
+```javascript
+{
+  name: "Servicio",
+  catalogValues: [
+    { nombre: "Personalización", descripcion: "Servicio de personalización", duracion: 8, estado: true },
+    { nombre: "Restauración", descripcion: "Servicio de restauración", duracion: 15, estado: true },
+  ],
+}
+```
+
+Generates:
+
+```typescript
+export const seedDataServicio = async (): Promise<void> => {
+  try {
+    const servicioRepo = AppDataSource.getRepository(Servicio);
+    const existing = await servicioRepo.count();
+    if (existing > 0) return; // Ya inicializado
+    
+    const values = [
+      { nombre: "Personalización", descripcion: "Servicio de personalización", duracion: 8, estado: true },
+      { nombre: "Restauración", descripcion: "Servicio de restauración", duracion: 15, estado: true },
+    ];
+    
+    await servicioRepo.save(servicioRepo.create(values as any[]));
+    console.log("✅  Servicio sembrado correctamente (2 registros)");
+  } catch (error) {
+    console.error("❌  Error al sembrar Servicio:", error);
+  }
+};
+```
+
+## Extra Endpoints
+
+Define custom endpoints for state changes:
+
+```javascript
+extraEndpoints: [
+  {
+    method: "patch",
+    route: "/cita/:id_cita/estado",
+    funcName: "cambiarEstadoCita",
+    description: "Cambiar el estado de una Cita",
+    targetEntity: "Cita",
+    targetPk: "id_cita",
+    targetField: "estadoCita",
+    selfPk: "id_estado_cita",
+    bodyParam: "id_estado_cita",
+  },
+]
+```
+
+Generates:
+
+```typescript
+export const cambiarEstadoCita = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const citaRepo = AppDataSource.getRepository(Cita);
+    const estadoCitaRepo = AppDataSource.getRepository(EstadoCita);
+    
+    const target = await citaRepo.findOneBy({ id_cita: Number(req.params.id_cita) });
+    if (!target) {
+      res.status(404).json({ success: false, message: "Cita no encontrado" });
+      return;
+    }
+    
+    const nuevoEstado = await estadoCitaRepo.findOneBy({
+      id_estado_cita: Number(req.body.id_estado_cita)
+    });
+    if (!nuevoEstado) {
+      res.status(404).json({ success: false, message: "EstadoCita no encontrado" });
+      return;
+    }
+    
+    target.estadoCita = nuevoEstado;
+    await citaRepo.save(target);
+    res.json({ success: true, message: "Cambiar el estado de una Cita actualizado", data: target });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Error en cambiarEstadoCita", error });
+  }
+};
+```
+
+## Junction Tables
+
+For many-to-many junction tables (`isJunction: true`):
+
+```javascript
+{
+  name: "PermisoRol",
+  isJunction: true,
+  compositePk: ["id_permiso", "id_rol"],
+}
+```
+
+Generates specialized CRUD without individual GET/PUT:
+
+- **POST /**: Create relationship with composite key validation
+- **DELETE /**: Delete by composite key in request body
+
+## Output
+
+```bash
+════════════════════════════════════════════════════════
+  🚀  generate-controllers.js
+════════════════════════════════════════════════════════
+
+────────────────────────────────────────────────────────
+  🎮  CONTROLADORES
+────────────────────────────────────────────────────────
+  ✅  controllers/PermisoController.ts
+  ✅  controllers/RolController.ts
+  ✅  controllers/UsuarioController.ts
+  ✅  controllers/ClienteController.ts
+  ✅  controllers/ServicioController.ts
+
+────────────────────────────────────────────────────────
+  🌱  ÍNDICE DE SEEDS
+────────────────────────────────────────────────────────
+  ✅  seeds/index.ts
+
+════════════════════════════════════════════════════════
+  🎉  16 archivos generados, 0 errores
+
+  📂  Estructura:
+      controllers/   15 archivos .ts
+      seeds/         index.ts
+
+  💡  En tu app.ts / data-source.ts agrega:
+      import { runAllSeeds } from "./seeds";
+      await AppDataSource.initialize();
+      await runAllSeeds();
+
+  🌱  Catálogos que se poblarán automáticamente:
+      • Servicio          5 registros
+      • EstadoCita        4 registros
+      • EstadoServicio    3 registros
+      • MetodoPago        2 registros
+      • EstadoPago        3 registros
+════════════════════════════════════════════════════════
+```
+
+## Seeds Index File
+
+The generator creates `seeds/index.ts` that calls all seed functions:
+
+```typescript
+import { seedDataServicio } from "../controllers/ServicioController";
+import { seedDataEstadoCita } from "../controllers/EstadoCitaController";
+import { seedDataMetodoPago } from "../controllers/MetodoPagoController";
+
+export async function runAllSeeds(): Promise<void> {
+  console.log("\n🌱  Iniciando semilla de catálogos...");
+  await seedDataServicio();   // 5 registros: Personalización, Restauración, ...
+  await seedDataEstadoCita(); // 4 registros: Pendiente, Completada, ...
+  await seedDataMetodoPago(); // 2 registros: Efectivo, Transferencia
+  console.log("✅  Semilla completada\n");
+}
+```
+
+## Integration
+
+In your `data-source.ts` or `app.ts`:
+
+```typescript
+import { AppDataSource } from "./data-source";
+import { runAllSeeds } from "./seeds";
+
+AppDataSource.initialize()
+  .then(async () => {
+    console.log("✅ TypeORM initialized");
+    await runAllSeeds();
+  })
+  .catch((error) => console.error(error));
+```
+
+<Note>
+Seed functions are idempotent: they only insert data if the table is empty.
+</Note>

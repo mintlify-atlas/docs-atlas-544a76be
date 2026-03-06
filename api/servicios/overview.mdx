@@ -1,0 +1,369 @@
+---
+title: "Servicios API"
+description: "Manage service offerings and catalog"
+---
+
+## Overview
+
+The Servicios (Services) API allows you to manage the service catalog in the Softwart system. Services represent the different offerings provided to customers, such as personalization, restoration, framing, decoration, and texturing.
+
+## Entity Schema
+
+### Servicio Model
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id_servicio` | number | Auto | Primary key, auto-generated |
+| `nombre` | string | Yes | Service name |
+| `descripcion` | string | No | Service description |
+| `duracion` | number | Yes | Estimated duration in days |
+| `estado` | boolean | Yes | Active/inactive status (default: true) |
+
+### Relationships
+
+- **One-to-Many with DetalleVenta**: A service can appear in multiple sale line items
+
+<Note>
+Deleting a service is only allowed if there are no associated DetalleVenta records. The API will return a 409 Conflict error if dependencies exist.
+</Note>
+
+## Authentication
+
+<Info>
+Servicio endpoints do NOT require authentication in the current implementation. This allows public access to the service catalog.
+</Info>
+
+<Warning>
+For production environments, consider adding authentication to protect write operations (POST, PUT, DELETE, PATCH).
+</Warning>
+
+## Seed Data
+
+The system includes seed data for common services:
+
+| Service | Description | Duration (days) |
+|---------|-------------|-----------------|
+| Personalización | Servicio de personalización | 8 |
+| Restauración | Servicio de restauración | 15 |
+| Enmarcación | Servicio de enmarcación | 8 |
+| Decoración | Servicio de decoración | 15 |
+| Texturizado | Servicio de texturizado | 15 |
+
+## Endpoints
+
+### List All Services
+
+```http
+GET /api/servicios
+```
+
+Retrieves all services in the system.
+
+**Response** (200 OK):
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id_servicio": 1,
+      "nombre": "Personalización",
+      "descripcion": "Servicio de personalización",
+      "duracion": 8,
+      "estado": true
+    },
+    {
+      "id_servicio": 2,
+      "nombre": "Restauración",
+      "descripcion": "Servicio de restauración",
+      "duracion": 15,
+      "estado": true
+    }
+  ]
+}
+```
+
+### Get Service by ID
+
+```http
+GET /api/servicios/:id
+```
+
+Retrieves a specific service by its ID.
+
+**Parameters**:
+- `id` (path parameter): Service ID
+
+**Response** (200 OK):
+```json
+{
+  "success": true,
+  "data": {
+    "id_servicio": 1,
+    "nombre": "Personalización",
+    "descripcion": "Servicio de personalización",
+    "duracion": 8,
+    "estado": true
+  }
+}
+```
+
+**Error Response** (404 Not Found):
+```json
+{
+  "success": false,
+  "message": "Servicio no encontrado"
+}
+```
+
+### Create Service
+
+```http
+POST /api/servicios
+```
+
+Creates a new service.
+
+**Request Body**:
+```json
+{
+  "nombre": "Grabado láser",
+  "descripcion": "Servicio de grabado láser en diversos materiales",
+  "duracion": 5,
+  "estado": true
+}
+```
+
+**Required Fields**: `nombre`, `duracion`
+
+**Optional Fields**: `descripcion`, `estado` (defaults to `true`)
+
+**Response** (201 Created):
+```json
+{
+  "success": true,
+  "message": "Servicio creado exitosamente",
+  "data": {
+    "id_servicio": 6,
+    "nombre": "Grabado láser",
+    "descripcion": "Servicio de grabado láser en diversos materiales",
+    "duracion": 5,
+    "estado": true
+  }
+}
+```
+
+**Error Response** (400 Bad Request):
+```json
+{
+  "success": false,
+  "message": "Campos requeridos: nombre, duracion"
+}
+```
+
+### Update Service
+
+```http
+PUT /api/servicios/:id
+```
+
+Updates an existing service. Only provided fields will be updated.
+
+<Info>
+The `estado` field is not updatable via this endpoint. Use the toggle endpoint instead.
+</Info>
+
+**Parameters**:
+- `id` (path parameter): Service ID
+
+**Request Body** (all fields optional):
+```json
+{
+  "nombre": "Personalización Premium",
+  "descripcion": "Servicio de personalización con materiales premium",
+  "duracion": 10
+}
+```
+
+**Response** (200 OK):
+```json
+{
+  "success": true,
+  "message": "Servicio actualizado",
+  "data": {
+    "id_servicio": 1,
+    "nombre": "Personalización Premium",
+    "descripcion": "Servicio de personalización con materiales premium",
+    "duracion": 10,
+    "estado": true
+  }
+}
+```
+
+### Delete Service
+
+```http
+DELETE /api/servicios/:id
+```
+
+Deletes a service. Only allowed if there are no associated sale details.
+
+**Parameters**:
+- `id` (path parameter): Service ID
+
+**Response** (200 OK):
+```json
+{
+  "success": true,
+  "message": "Servicio eliminado correctamente"
+}
+```
+
+**Error Response** (409 Conflict):
+```json
+{
+  "success": false,
+  "message": "No se puede eliminar: existen DetalleVenta asociados (12)"
+}
+```
+
+### Toggle Service Status
+
+```http
+PATCH /api/servicios/:id/estado
+```
+
+Toggles the service's active/inactive status.
+
+**Parameters**:
+- `id` (path parameter): Service ID
+
+**Response** (200 OK):
+```json
+{
+  "success": true,
+  "message": "Servicio activado",
+  "data": {
+    "estado": true
+  }
+}
+```
+
+## Usage Examples
+
+### Fetching Active Services
+
+```javascript
+const response = await fetch('https://api.softwart.com/api/servicios');
+const result = await response.json();
+
+if (result.success) {
+  const activeServices = result.data.filter(service => service.estado);
+  console.log('Active services:', activeServices);
+}
+```
+
+### Creating a New Service
+
+```bash
+curl -X POST https://api.softwart.com/api/servicios \
+  -H "Content-Type: application/json" \
+  -d '{
+    "nombre": "Impresión 3D",
+    "descripcion": "Servicio de impresión 3D personalizada",
+    "duracion": 7
+  }'
+```
+
+### Updating Service Duration
+
+```javascript
+const updateDuration = async (serviceId, newDuration) => {
+  const response = await fetch(`https://api.softwart.com/api/servicios/${serviceId}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      duracion: newDuration
+    })
+  });
+  
+  return await response.json();
+};
+
+// Update service 1 duration to 12 days
+await updateDuration(1, 12);
+```
+
+### Deactivating a Service
+
+```javascript
+const deactivateService = async (serviceId) => {
+  const response = await fetch(`https://api.softwart.com/api/servicios/${serviceId}`, {
+    method: 'GET'
+  });
+  
+  const result = await response.json();
+  if (result.success && result.data.estado) {
+    // Service is active, toggle it off
+    await fetch(`https://api.softwart.com/api/servicios/${serviceId}/estado`, {
+      method: 'PATCH'
+    });
+  }
+};
+```
+
+### Calculating Estimated Completion Date
+
+```javascript
+const getEstimatedCompletion = (serviceId, startDate) => {
+  return fetch(`https://api.softwart.com/api/servicios/${serviceId}`)
+    .then(res => res.json())
+    .then(result => {
+      if (result.success) {
+        const completionDate = new Date(startDate);
+        completionDate.setDate(completionDate.getDate() + result.data.duracion);
+        return completionDate;
+      }
+      return null;
+    });
+};
+
+// Usage
+const completion = await getEstimatedCompletion(1, '2026-03-10');
+console.log('Estimated completion:', completion.toISOString().split('T')[0]);
+```
+
+## Service Categories
+
+While not explicitly modeled, services typically fall into these categories:
+
+- **Personalización**: Custom design and personalization services
+- **Restauración**: Restoration and repair services
+- **Enmarcación**: Framing and mounting services
+- **Decoración**: Decorative enhancements
+- **Texturizado**: Texture and surface treatments
+
+<Tip>
+Consider implementing a `categoria` field in future versions to enable better service organization and filtering.
+</Tip>
+
+## Error Responses
+
+All endpoints may return the following error responses:
+
+| Status Code | Description |
+|-------------|-------------|
+| 400 | Bad Request - Missing required fields |
+| 404 | Not Found - Service doesn't exist |
+| 409 | Conflict - Cannot delete due to dependencies |
+| 500 | Internal Server Error |
+
+**Generic Error Format**:
+```json
+{
+  "success": false,
+  "message": "Error description",
+  "error": {} // Additional error details (dev mode only)
+}
+```

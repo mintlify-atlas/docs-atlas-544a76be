@@ -1,0 +1,380 @@
+---
+title: "Payment Methods"
+description: "API reference for payment method catalog endpoints"
+---
+
+# Payment Methods (Métodos de Pago)
+
+The **MetodoPago** entity is a catalog that defines available payment methods in the system. These values are used when recording payments (Pago) for sales transactions.
+
+## Overview
+
+The payment method catalog provides:
+- Predefined payment options (Efectivo, Transferencia)
+- Referential integrity for payment records
+- Simple read operations
+- Auto-seeding on first startup
+
+## Entity Schema
+
+```typescript title="src/models/MetodoPago.ts"
+import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
+import { Pago } from "./Pago";
+
+@Entity("metodo_pago")
+export class MetodoPago {
+  @PrimaryGeneratedColumn()
+  id_metodo_pago!: number;
+
+  @Column()
+  nombre!: string; // "Efectivo", "Transferencia"
+
+  @OneToMany(() => Pago, (x) => x.metodoPago)
+  pagos!: Pago[];
+}
+```
+
+### Schema Fields
+
+<ResponseField name="id_metodo_pago" type="number">
+  Auto-generated primary key
+</ResponseField>
+
+<ResponseField name="nombre" type="string">
+  Payment method name (e.g., "Efectivo", "Transferencia")
+</ResponseField>
+
+<ResponseField name="pagos" type="Pago[]">
+  One-to-many relationship with payment records
+</ResponseField>
+
+## Predefined Values
+
+The following payment methods are auto-seeded on first application startup:
+
+| ID | Nombre | Description |
+|----|--------|-------------|
+| 1 | Efectivo | Cash payment |
+| 2 | Transferencia | Bank transfer |
+
+<Note>
+You can add more payment methods (e.g., "Tarjeta de Crédito", "Tarjeta de Débito", "PayPal") by creating new records via the API or database.
+</Note>
+
+## API Endpoints
+
+### GET /api/metodo-pago
+
+List all available payment methods.
+
+**Authentication**: Not required (public access)
+
+**Request**:
+```bash
+curl -X GET https://api.example.com/api/metodo-pago
+```
+
+**Response** (200):
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id_metodo_pago": 1,
+      "nombre": "Efectivo"
+    },
+    {
+      "id_metodo_pago": 2,
+      "nombre": "Transferencia"
+    }
+  ]
+}
+```
+
+### GET /api/metodo-pago/:id
+
+Get a specific payment method by ID.
+
+**Authentication**: Not required (public access)
+
+**Request**:
+```bash
+curl -X GET https://api.example.com/api/metodo-pago/1
+```
+
+**Response** (200):
+```json
+{
+  "success": true,
+  "data": {
+    "id_metodo_pago": 1,
+    "nombre": "Efectivo"
+  }
+}
+```
+
+**Error Response** (404):
+```json
+{
+  "success": false,
+  "message": "MetodoPago no encontrado"
+}
+```
+
+### POST /api/metodo-pago
+
+Create a new payment method (Admin only).
+
+**Authentication**: Required (Admin role)
+
+**Request**:
+```bash
+curl -X POST https://api.example.com/api/metodo-pago \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -d '{
+    "nombre": "Tarjeta de Crédito"
+  }'
+```
+
+**Request Body**:
+
+<ParamField path="nombre" type="string" required>
+  Payment method name (e.g., "Tarjeta de Crédito", "PayPal")
+</ParamField>
+
+**Response** (201):
+```json
+{
+  "success": true,
+  "data": {
+    "id_metodo_pago": 3,
+    "nombre": "Tarjeta de Crédito"
+  }
+}
+```
+
+**Error Responses**:
+
+- **400 Bad Request** - Missing required field `nombre`
+- **401 Unauthorized** - Missing or invalid JWT token
+- **403 Forbidden** - User is not an Admin
+
+### PUT /api/metodo-pago/:id
+
+Update an existing payment method (Admin only).
+
+**Authentication**: Required (Admin role)
+
+**Request**:
+```bash
+curl -X PUT https://api.example.com/api/metodo-pago/1 \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -d '{
+    "nombre": "Efectivo (Actualizado)"
+  }'
+```
+
+**Request Body**:
+
+<ParamField path="nombre" type="string">
+  Updated payment method name
+</ParamField>
+
+**Response** (200):
+```json
+{
+  "success": true,
+  "data": {
+    "id_metodo_pago": 1,
+    "nombre": "Efectivo (Actualizado)"
+  }
+}
+```
+
+### DELETE /api/metodo-pago/:id
+
+Delete a payment method (Admin only).
+
+**Authentication**: Required (Admin role)
+
+<Warning>
+Cannot delete a payment method if it's referenced by existing payment records. Delete or reassign those payments first.
+</Warning>
+
+**Request**:
+```bash
+curl -X DELETE https://api.example.com/api/metodo-pago/3 \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+**Response** (200):
+```json
+{
+  "success": true,
+  "message": "MetodoPago eliminado"
+}
+```
+
+**Error Response** (409 Conflict):
+```json
+{
+  "success": false,
+  "message": "No se puede eliminar: 5 registro(s) de Pago lo referencian"
+}
+```
+
+## Seeding Process
+
+Payment methods are automatically seeded on first application startup:
+
+```typescript title="src/controllers/MetodoPagoController.ts" lines
+export const seedDataMetodoPago = async (): Promise<void> => {
+  const metodoPagoRepo = AppDataSource.getRepository(MetodoPago);
+  const existing = await metodoPagoRepo.count();
+  if (existing > 0) return; // Already initialized
+
+  const values = [
+    { nombre: "Efectivo" },
+    { nombre: "Transferencia" },
+  ];
+
+  await metodoPagoRepo.save(metodoPagoRepo.create(values));
+  console.log("✅  MetodoPago sembrado correctamente (2 registros)");
+};
+```
+
+This seed function is called during application bootstrap:
+
+```typescript title="src/app.ts" lines
+import { runAllSeeds } from "./seeds/index";
+
+async function bootstrap(): Promise<void> {
+  await AppDataSource.initialize();
+  await runAllSeeds(); // Seeds all catalogs including MetodoPago
+  app.listen(PORT);
+}
+```
+
+## Usage in Business Logic
+
+### Creating a Payment
+
+When creating a payment (Pago), reference the payment method by ID:
+
+```typescript
+import { AppDataSource } from "./data-source";
+import { Pago } from "./models/Pago";
+
+const pagoRepo = AppDataSource.getRepository(Pago);
+
+const nuevoPago = pagoRepo.create({
+  monto: 250.00,
+  fechaPago: new Date(),
+  venta: { id_venta: 15 },
+  metodoPago: { id_metodo_pago: 1 }, // Efectivo
+  estadoPago: { id_estado_pago: 2 }, // Pagado
+});
+
+await pagoRepo.save(nuevoPago);
+```
+
+### Querying Payments by Method
+
+```typescript
+// Get all cash payments
+const cashPayments = await pagoRepo.find({
+  where: { metodoPago: { nombre: "Efectivo" } },
+  relations: ["metodoPago", "venta"],
+});
+
+console.log(`Total cash payments: ${cashPayments.length}`);
+```
+
+### Calculate Revenue by Payment Method
+
+```typescript
+const payments = await pagoRepo.find({
+  where: { estadoPago: { nombre: "Pagado" } },
+  relations: ["metodoPago"],
+});
+
+const revenueByMethod = payments.reduce((acc, pago) => {
+  const method = pago.metodoPago.nombre;
+  acc[method] = (acc[method] || 0) + pago.monto;
+  return acc;
+}, {} as Record<string, number>);
+
+console.log("Revenue by payment method:", revenueByMethod);
+// { "Efectivo": 1500, "Transferencia": 3200 }
+```
+
+## Common Patterns
+
+### Load Payment Method with Payments
+
+```typescript
+const pagos = await pagoRepo.find({
+  relations: ["metodoPago", "venta", "estadoPago"],
+});
+
+pagos.forEach((pago) => {
+  console.log(
+    `Pago #${pago.id_pago}: $${pago.monto} via ${pago.metodoPago.nombre}`
+  );
+});
+```
+
+### Filter by Payment Method in API
+
+```typescript
+export const getPaymentsByMethod = async (req: Request, res: Response) => {
+  const { id_metodo_pago } = req.query;
+
+  const pagos = await pagoRepo.find({
+    where: { metodoPago: { id_metodo_pago: Number(id_metodo_pago) } },
+    relations: ["venta", "metodoPago"],
+  });
+
+  res.json({ success: true, data: pagos });
+};
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use ID References" icon="hashtag">
+    Always reference payment methods by `id_metodo_pago`, not by name string
+  </Card>
+  <Card title="Load Relations" icon="link">
+    Use `relations: ["metodoPago"]` when querying payments to get method names
+  </Card>
+  <Card title="Validate Before Delete" icon="shield-check">
+    Check for existing payment records before deleting a method
+  </Card>
+  <Card title="Extend Values" icon="plus">
+    Add new payment methods as needed (credit card, debit card, etc.)
+  </Card>
+</CardGroup>
+
+<Tip>
+If your business expands to multiple payment processors (Stripe, PayPal, etc.), you can add a `tipo` or `procesador` field to distinguish between cash, card, and online methods.
+</Tip>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Estado Catalogs" icon="list" href="/api/catalogs/estados">
+    Learn about appointment, service, and payment status catalogs
+  </Card>
+  <Card title="Sales API" icon="money-bill" href="/api/ventas/overview">
+    Explore sales and payment endpoints
+  </Card>
+  <Card title="Database Seeding" icon="seedling" href="/concepts/typeorm-integration">
+    Understand the catalog seeding process
+  </Card>
+  <Card title="TypeORM Relations" icon="link" href="/concepts/typeorm-integration">
+    Learn how to work with entity relationships
+  </Card>
+</CardGroup>

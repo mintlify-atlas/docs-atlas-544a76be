@@ -1,0 +1,364 @@
+---
+title: "Estado Catalogs"
+description: "API reference for appointment status, service status, and payment status catalog endpoints"
+---
+
+# Estado Catalogs
+
+Softwart Backend includes three **estado (status)** catalog entities that define predefined status values for appointments, services, and payments. These are read-mostly entities that are seeded at application startup.
+
+## Overview
+
+Catalog entities provide:
+- Predefined status values for business entities
+- Referential integrity via foreign keys
+- Simple CRUD operations (primarily read)
+- Auto-seeding on first application startup
+
+### Catalog Entities
+
+<CardGroup cols={3}>
+  <Card title="EstadoCita" icon="calendar-check">
+    Appointment status (Pendiente, Completada, No Asistió, Cancelada)
+  </Card>
+  <Card title="EstadoServicio" icon="wrench">
+    Service status tracking
+  </Card>
+  <Card title="EstadoPago" icon="money-bill">
+    Payment status (Pendiente, Pagado, Cancelado)
+  </Card>
+</CardGroup>
+
+## EstadoCita (Appointment Status)
+
+### Entity Schema
+
+```typescript title="src/models/EstadoCita.ts"
+@Entity("estado_cita")
+export class EstadoCita {
+  @PrimaryGeneratedColumn()
+  id_estado_cita!: number;
+
+  @Column()
+  nombre!: string; // "Pendiente", "Completada", "No Asistió", "Cancelada"
+
+  @OneToMany(() => Cita, (x) => x.estadoCita)
+  citas!: Cita[];
+}
+```
+
+### Predefined Values
+
+The following values are auto-seeded:
+
+| ID | Nombre | Description |
+|----|--------|-------------|
+| 1 | Pendiente | Appointment scheduled, not yet completed |
+| 2 | Completada | Appointment completed successfully |
+| 3 | No Asistió | Client did not show up |
+| 4 | Cancelada | Appointment was cancelled |
+
+### GET /api/estado-cita
+
+List all appointment statuses.
+
+**Request**:
+```bash
+GET /api/estado-cita
+```
+
+**Response** (200):
+```json
+{
+  "success": true,
+  "data": [
+    { "id_estado_cita": 1, "nombre": "Pendiente" },
+    { "id_estado_cita": 2, "nombre": "Completada" },
+    { "id_estado_cita": 3, "nombre": "No Asistió" },
+    { "id_estado_cita": 4, "nombre": "Cancelada" }
+  ]
+}
+```
+
+### GET /api/estado-cita/:id
+
+Get a specific appointment status by ID.
+
+**Request**:
+```bash
+GET /api/estado-cita/1
+```
+
+**Response** (200):
+```json
+{
+  "success": true,
+  "data": {
+    "id_estado_cita": 1,
+    "nombre": "Pendiente"
+  }
+}
+```
+
+**Error Response** (404):
+```json
+{
+  "success": false,
+  "message": "EstadoCita no encontrado"
+}
+```
+
+## EstadoServicio (Service Status)
+
+### Entity Schema
+
+```typescript title="src/models/EstadoServicio.ts"
+@Entity("estado_servicio")
+export class EstadoServicio {
+  @PrimaryGeneratedColumn()
+  id_estado_servicio!: number;
+
+  @Column()
+  nombre!: string;
+}
+```
+
+### GET /api/estado-servicio
+
+List all service statuses.
+
+**Request**:
+```bash
+GET /api/estado-servicio
+```
+
+**Response** (200):
+```json
+{
+  "success": true,
+  "data": [
+    { "id_estado_servicio": 1, "nombre": "Activo" },
+    { "id_estado_servicio": 2, "nombre": "Inactivo" }
+  ]
+}
+```
+
+### GET /api/estado-servicio/:id
+
+Get a specific service status by ID.
+
+**Request**:
+```bash
+GET /api/estado-servicio/1
+```
+
+**Response** (200):
+```json
+{
+  "success": true,
+  "data": {
+    "id_estado_servicio": 1,
+    "nombre": "Activo"
+  }
+}
+```
+
+## EstadoPago (Payment Status)
+
+### Entity Schema
+
+```typescript title="src/models/EstadoPago.ts"
+@Entity("estado_pago")
+export class EstadoPago {
+  @PrimaryGeneratedColumn()
+  id_estado_pago!: number;
+
+  @Column()
+  nombre!: string; // "Pendiente", "Pagado", "Cancelado"
+
+  @OneToMany(() => Pago, (x) => x.estadoPago)
+  pagos!: Pago[];
+}
+```
+
+### Predefined Values
+
+| ID | Nombre | Description |
+|----|--------|-------------|
+| 1 | Pendiente | Payment expected but not yet received |
+| 2 | Pagado | Payment completed |
+| 3 | Cancelado | Payment cancelled |
+
+### GET /api/estado-pago
+
+List all payment statuses.
+
+**Request**:
+```bash
+GET /api/estado-pago
+```
+
+**Response** (200):
+```json
+{
+  "success": true,
+  "data": [
+    { "id_estado_pago": 1, "nombre": "Pendiente" },
+    { "id_estado_pago": 2, "nombre": "Pagado" },
+    { "id_estado_pago": 3, "nombre": "Cancelado" }
+  ]
+}
+```
+
+### GET /api/estado-pago/:id
+
+Get a specific payment status by ID.
+
+**Request**:
+```bash
+GET /api/estado-pago/1
+```
+
+**Response** (200):
+```json
+{
+  "success": true,
+  "data": {
+    "id_estado_pago": 1,
+    "nombre": "Pendiente"
+  }
+}
+```
+
+## Seeding Process
+
+All estado catalogs are automatically seeded on first application startup:
+
+```typescript title="src/controllers/EstadoCitaController.ts" lines
+export const seedDataEstadoCita = async (): Promise<void> => {
+  const estadoCitaRepo = AppDataSource.getRepository(EstadoCita);
+  const existing = await estadoCitaRepo.count();
+  if (existing > 0) return; // Already initialized
+
+  const values = [
+    { nombre: "Pendiente" },
+    { nombre: "Completada" },
+    { nombre: "No Asistió" },
+    { nombre: "Cancelada" },
+  ];
+
+  await estadoCitaRepo.save(estadoCitaRepo.create(values));
+  console.log("✅  EstadoCita sembrado correctamente (4 registros)");
+};
+```
+
+Seeds are called from `src/seeds/index.ts` during the bootstrap process in `app.ts`:
+
+```typescript title="src/app.ts" lines
+import { runAllSeeds } from "./seeds/index";
+
+async function bootstrap(): Promise<void> {
+  await AppDataSource.initialize();
+  await runAllSeeds(); // Seeds all catalogs
+  // ...
+}
+```
+
+<Note>
+Seeding only runs if the table is empty, so it's safe to call on every startup.
+</Note>
+
+## Usage in Business Entities
+
+### Appointments (Citas)
+
+```typescript
+const cita = citaRepo.create({
+  fecha: new Date("2024-06-15"),
+  hora: "10:00",
+  cliente: { id_cliente: 1 },
+  estadoCita: { id_estado_cita: 1 }, // Pendiente
+});
+await citaRepo.save(cita);
+```
+
+### Payments (Pagos)
+
+```typescript
+const pago = pagoRepo.create({
+  monto: 150.00,
+  fechaPago: new Date(),
+  venta: { id_venta: 10 },
+  metodoPago: { id_metodo_pago: 1 },
+  estadoPago: { id_estado_pago: 2 }, // Pagado
+});
+await pagoRepo.save(pago);
+```
+
+## Common Queries
+
+### Filter Appointments by Status
+
+```typescript
+// Get all pending appointments
+const pending = await citaRepo.find({
+  where: { estadoCita: { id_estado_cita: 1 } },
+  relations: ["cliente", "estadoCita"],
+});
+```
+
+### Count Completed Appointments
+
+```typescript
+const completedCount = await citaRepo.count({
+  where: { estadoCita: { nombre: "Completada" } },
+});
+```
+
+### Filter Payments by Status
+
+```typescript
+// Get all paid payments
+const paidPayments = await pagoRepo.find({
+  where: { estadoPago: { nombre: "Pagado" } },
+  relations: ["venta", "metodoPago", "estadoPago"],
+});
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use IDs in API Calls" icon="hashtag">
+    Always reference estado by ID, not by name, for consistency
+  </Card>
+  <Card title="Don't Delete Catalogs" icon="ban">
+    Catalogs are referenced by foreign keys. Deleting them will cause constraint errors.
+  </Card>
+  <Card title="Extend Values Carefully" icon="plus">
+    If adding new status values, ensure they're properly seeded in all environments
+  </Card>
+  <Card title="Load Relations" icon="link">
+    Use `relations: ["estadoCita"]` to load status names with business entities
+  </Card>
+</CardGroup>
+
+<Warning>
+Deleting or modifying predefined estado values can break existing business entity records. Only add new values if needed.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Payment Methods" icon="credit-card" href="/api/catalogs/metodos-pago">
+    Explore payment method catalog endpoints
+  </Card>
+  <Card title="Appointments API" icon="calendar" href="/api/citas/overview">
+    See how appointments use estado_cita
+  </Card>
+  <Card title="Payments API" icon="money-bill" href="/api/ventas/overview">
+    Learn about sales and payment tracking
+  </Card>
+  <Card title="Database Seeding" icon="seedling" href="/concepts/typeorm-integration">
+    Understand the seeding process
+  </Card>
+</CardGroup>
